@@ -1,0 +1,40 @@
+{
+    "configurations": [
+        {
+            "name": "Linux",
+            "includePath": [
+                "${workspaceFolder}/**",
+                "/usr/local/cuda-12.3/targets/x86_64-linux/include",
+                "/usr/local/cuda-12.3/include"
+            ],
+            "defines": [],
+            // "compilerPath": "/usr/local/cuda/bin/nvcc",
+            "compilerPath": "/usr/bin/g++",
+            "compilerArgs": [
+                "-march=native"
+            ],
+            "cStandard": "c17",
+            "cppStandard": "c++17",
+            "intelliSenseMode": "linux-clang-x64"
+        }
+        // cuh files
+        // {
+        //     "name": "Linux-cuda",
+        //     "includePath": [
+        //         "${workspaceFolder}/**",
+        //         "/usr/local/cuda-12.3/targets/x86_64-linux/include",
+        //         "/usr/local/cuda-12.3/include"
+        //     ],
+        //     "defines": [],
+        //     "compilerPath": "/usr/local/cuda/bin/nvcc",
+        //     "compilerArgs": [
+        //         "-march=native"
+        //     ],
+        //     "cStandard": "c17",
+        //     "cppStandard": "c++17",
+        //     "intelliSenseMode": "linux-clang-x64",
+            
+        // }
+    ],
+    "version": 4
+}
