@@ -8,7 +8,7 @@ void swishmul_cpu_kernel(void* input, void* other, void* output, int size, TENSO
 void swishmul_cuda_kernel(void* input, void* other, void* output, int size, TENSORTYPE dtype);
 
 inline Tensor Tensor::swishmul(Tensor& other){
-    Tensor output = Tensor(this->shape, this->dtype, this->device, this->device_id);
+    Tensor output = *this;
     
     int size = this->get_element_count();
     if (this->device == DEVICE::CPU){

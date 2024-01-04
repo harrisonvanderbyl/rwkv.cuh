@@ -23,6 +23,7 @@ class RWKV_5_ATT
         Linear gate;
         Linear output;
         LayerNorm ln_x;
+        Tensor buffer;
         int layer = 0;
 
         RWKV_5_ATT(){
@@ -62,32 +63,36 @@ class RWKV_5_ATT
         Tensor operator()(Tensor input, Tensor residual){
 
 
-            
+            if(buffer.data == nullptr || buffer.shape[0] * buffer.shape[1] < input.shape[0] * input.shape[1] || buffer.dtype != input.dtype || buffer.device != input.device){
+                buffer = Tensor({input.shape[0],input.shape[1], input.shape[2]}, input.dtype, input.device);
+            }
+
+            auto cbuf = buffer.cloneWithFalseReshape({input.shape[0],input.shape[1], input.shape[2]});
             
             auto xx = this->timeshift(input);
             
             
             
-            auto kr = this->time_mix_k.lerp(xx, input);
+            auto kr = this->time_mix_k.lerp(xx, input, cbuf);
             auto k = this->key(kr);
-            auto vr = this->time_mix_v.lerp(xx, input);
+            auto vr = this->time_mix_v.lerp(xx, input, cbuf);
             auto v = this->value(vr);
-            auto rr = this->time_mix_r.lerp(xx, input);
+            auto rr = this->time_mix_r.lerp(xx, input, cbuf);
             auto r = this->receptance(rr);
-            auto gr = this->time_mix_g.lerp(xx, input);
+            auto gr = this->time_mix_g.lerp(xx, input, cbuf);
             auto gv = this->gate(gr);
 
     
-            auto xm = this->state.wkv5(r,k,v,this->time_decay,this->time_faaaa);
+            auto xm = this->state.wkv5(r,k,v,this->time_decay,this->time_faaaa, cbuf);
 
-
+           
        
             auto xxa = this->ln_x(xm);
 
 
             auto gvo = gv.swishmul(xxa);
 
-               
+            
             return this->output(gvo, residual);
         }
 

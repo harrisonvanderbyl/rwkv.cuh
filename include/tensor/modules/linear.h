@@ -9,7 +9,7 @@ class Linear
         Tensor weight;
         Tensor range;
         Tensor offset;
-        Tensor buffer;
+        Tensor buffer = Tensor();
         bool quantized = false;
         
         Linear(){
@@ -35,6 +35,7 @@ class Linear
             this->range = other.range;
             this->offset = other.offset;
             this->quantized = other.quantized;
+            this->buffer = other.buffer;
 
             
         }
@@ -43,10 +44,15 @@ class Linear
         
         Tensor operator()(Tensor& input) {
 
+            if(buffer.data == nullptr || buffer.shape[0] * buffer.shape[1] < input.shape[0] * input.shape[1] || buffer.dtype != input.dtype || buffer.device != input.device){
+                buffer = Tensor({input.shape[0],input.shape[1], weight.shape[0]}, input.dtype, input.device);
+            }
+            buffer.empty();
+
             if (this->quantized){
-                return this->weight.matmul(this->range, this->offset, input);
+                return this->weight.matmul(this->range, this->offset, input, buffer).cloneWithFalseReshape({input.shape[0],input.shape[1], weight.shape[0]});
             }else{
-                return this->weight.matmul(input);
+                return this->weight.matmul(input, buffer).cloneWithFalseReshape({input.shape[0],input.shape[1], weight.shape[0]});
             }  
         }
 
@@ -65,6 +71,9 @@ class Linear
                 this->range = this->range.cuda();
                 this->offset = this->offset.cuda();
             }
+
+            // this->buffer = this->buffer.cuda();
+            // not needed, buffer will be recreated on device mismatch
         }
 
 };

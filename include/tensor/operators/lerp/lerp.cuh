@@ -13,7 +13,7 @@ __global__ void lerp_kernel(T *w, T *a, T *b, T* c, size_t size, size_t loopsize
 
 void lerp_cuda_kernel(void* w, void* A, void* B, void* output, size_t size, size_t loopsize, TENSORTYPE dtype)
 {
-        size_t block_size = 1024;
+        size_t block_size = 512;
         size_t num_blocks = (size + block_size - 1) / block_size;
         if (dtype == TENSORTYPE::kFLOAT_32){
             lerp_kernel<<<num_blocks, block_size>>>((float*)w, (float*)A, (float*)B, (float*)output, size, loopsize);

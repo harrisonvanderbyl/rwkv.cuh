@@ -12,7 +12,7 @@ __global__ void swishmul_kernel(T *a, T *b, T *c, int size) {
 }
 
 void swishmul_cuda_kernel(void* input, void* other, void* output, int size, TENSORTYPE dtype){
-    int threads = 1024;
+    int threads = 512;
     int blocks = (size + threads - 1) / threads;
 
     if (dtype == TENSORTYPE::kFLOAT_32)

@@ -8,7 +8,7 @@ void sigmoidmul_cpu_kernel(void* input, void* other, void* residual, void* outpu
 void sigmoidmul_cuda_kernel(void* input, void* other, void* residual, void* output, size_t size, TENSORTYPE dtype);
 
 inline Tensor Tensor::sigmoidmul(Tensor& other, Tensor& residual){
-    Tensor output = Tensor(this->shape, this->dtype, this->device, this->device_id);
+    Tensor output = *this;
     
     int size = this->get_element_count();
     if (this->device == DEVICE::CPU){

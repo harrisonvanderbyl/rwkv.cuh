@@ -12,6 +12,7 @@ class TimeShift
         ulong max_batch;
         ulong max_seq;
         ulong dims;
+        Tensor buffer;
         
         TimeShift(){
         }
@@ -26,9 +27,14 @@ class TimeShift
         }
 
         Tensor operator()(Tensor input){
+
+            if (buffer.data == nullptr || buffer.shape[0] * buffer.shape[1] < input.shape[0] * input.shape[1] || buffer.dtype != input.dtype || buffer.device != input.device){
+                buffer = Tensor({input.shape[0],input.shape[1], input.shape[2]}, input.dtype, input.device);
+            }
+
             auto batches = input.shape[0];
             auto seq = input.shape[1];
-            Tensor output = Tensor(input.shape, input.dtype, input.device, input.device_id);
+            Tensor output = buffer.cloneWithFalseReshape({batches, seq, this->dims});
 
             for (size_t i = 0; i < batches; i++){
                 output[i][0].copyfrom(this->state[i][0]);

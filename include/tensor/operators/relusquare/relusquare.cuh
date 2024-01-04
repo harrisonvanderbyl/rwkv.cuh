@@ -16,7 +16,7 @@ __global__ void relusquare_kernel(T *a, T *b, int size) {
 }
 
 void relusquare_cuda_kernel(void* input, void* output, int size, TENSORTYPE dtype){
-    int block_size = 1024;
+    int block_size = 512;
     int grid_size = (size + block_size - 1) / block_size;
     if (dtype == TENSORTYPE::kFLOAT_32) {
         relusquare_kernel<float><<<grid_size, block_size>>>((float*)input, (float*)output, size);

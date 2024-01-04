@@ -37,7 +37,7 @@ inline Tensor Tensor::matmul(Tensor &Art, Tensor &Aot,
     const size_t BB = Bt.shape[0];
     const size_t T = Bt.shape[1];
     const size_t INSHAPE = Bt.shape[2];
-    const size_t OUTSHAPE = Ct.shape[2];
+    const size_t OUTSHAPE = this->shape[0];
 
     if (Bt.device == DEVICE::CPU)
     {
@@ -83,10 +83,9 @@ inline Tensor Tensor::matmul(Tensor &Bt, Tensor Ct)
     return Ct;
 }
 
-inline Tensor Tensor::wkv5(Tensor &r, Tensor &k, Tensor &v, Tensor &w, Tensor &u)
+inline Tensor Tensor::wkv5(Tensor &r, Tensor &k, Tensor &v, Tensor &w, Tensor &u, Tensor &y)
 {
 
-    Tensor y = Tensor({r.shape[0], r.shape[1], r.shape[2]}, r.dtype, r.device, r.device_id);
     auto rr = r.data;
     auto kk = k.data;
     auto vv = v.data;

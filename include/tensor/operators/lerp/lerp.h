@@ -7,8 +7,7 @@ void lerp_cuda_kernel(void* w, void* A, void* B, void* output, size_t size, size
 void lerp_cpu_kernel(void* w, void* A, void* B, void* output, size_t size, size_t loopsize, TENSORTYPE dtype);
 
 
-inline Tensor Tensor::lerp(Tensor& A, Tensor& B){
-    Tensor output = Tensor(A.shape, A.dtype, A.device, A.device_id);
+inline Tensor Tensor::lerp(Tensor& A, Tensor& B, Tensor& output){
     size_t loopsize = this->get_element_count();
     size_t size = A.get_element_count();
 

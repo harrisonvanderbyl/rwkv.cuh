@@ -15,10 +15,12 @@ inline Tensor Tensor::operator[](const size_t index) {
     return out;
 }
 
-inline Tensor Tensor::operator[](std::vector<std::vector<size_t>> indices) {
+inline Tensor Tensor::gather(std::vector<std::vector<size_t>> indices, Tensor out) {
     
+    if (out.data == nullptr) {
+        out = Tensor({indices.size(), indices[0].size(), shape[1]}, dtype, device, device_id);
+    }
     std::vector<size_t> new_shape = {indices.size(), indices[0].size(), shape[1]};
-    auto out = Tensor(new_shape, dtype, device, device_id);
 
     for (int i = 0; i < indices.size(); i++) {
         for (int j = 0; j < indices[0].size(); j++) {

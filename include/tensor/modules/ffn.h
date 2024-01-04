@@ -14,6 +14,7 @@ class FFN
         Linear receptance;
         Linear key;
         Linear value;
+        Tensor buffer;
 
         FFN(){
         }
@@ -35,14 +36,19 @@ class FFN
         }
         Tensor operator()(Tensor input, Tensor residual){
 
+            if (buffer.data == nullptr || buffer.shape[0] * buffer.shape[1] < input.shape[0] * input.shape[1] || buffer.dtype != input.dtype || buffer.device != input.device){
+                buffer = Tensor({input.shape[0],input.shape[1], input.shape[2]}, input.dtype, input.device);
+            }
+
+            auto cbuf = buffer.cloneWithFalseReshape({input.shape[0],input.shape[1], input.shape[2]});
             
             auto xx = timeshift(input);
 
-            auto kr = time_mix_k.lerp(xx, input);
+            auto kr = time_mix_k.lerp(xx, input, cbuf);
             auto k = key(kr);
 
            
-            auto rr = this->time_mix_r.lerp(xx, input);
+            auto rr = this->time_mix_r.lerp(xx, input, cbuf);
             auto r = this->receptance(rr);
 
             auto krs = k.relusquared();

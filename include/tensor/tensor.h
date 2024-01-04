@@ -1,8 +1,9 @@
 
 #ifndef TENSOR_TENSOR_H
 #define TENSOR_TENSOR_H
-
+#include <iostream>
 #include "nlohmann/json.hpp"
+// backtrace
 #if defined(__CUDACC__) || defined(__HIPCC__)
 #include "cuda_runtime.h"
 #endif
@@ -55,6 +56,7 @@ bfloat16 float32_to_bfloat16(float value){
 
 #define cudaMemcpy(...) throw std::runtime_error("CUDA not enabled")
 #define cudaMalloc(...) throw std::runtime_error("CUDA not enabled")
+#define cudaMemset(...) throw std::runtime_error("CUDA not enabled")
 #define cudaMallocHost(pointer, size) *pointer = malloc(size)
 
 
@@ -270,6 +272,7 @@ struct Tensor{
 
         if (device == DEVICE::CUDA){
             cudaMalloc(&this->data, this->data_size_in_bytes);
+            cudaMemset(this->data, 0, this->data_size_in_bytes);
         } else if (device == DEVICE::ROCM){
             cudaMalloc(&this->data, this->data_size_in_bytes);
         } else if (device == DEVICE::VULKAN){
@@ -286,6 +289,9 @@ struct Tensor{
         }
 
         // this->data = malloc(this->data_size_in_bytes);
+
+        // print current stack trace
+
     }
 
     Tensor(std::vector<size_t> shape, void* data, TENSORTYPE dtype=TENSORTYPE::kFLOAT_32, DEVICE device=DEVICE::CPU, int device_id=0){
@@ -300,6 +306,35 @@ struct Tensor{
         this->data = data;
     }
 
+    void empty(){
+        if (data != nullptr){
+            if (device == DEVICE::CUDA){
+                cudaMemset(data, 0, data_size_in_bytes);
+            } else if (device == DEVICE::CPU){
+                memset(data, 0, data_size_in_bytes);
+            } else{
+                throw std::runtime_error("empty only implemented for CPU and CUDA");
+            }
+        }
+    }
+
+    Tensor cloneWithFalseReshape( std::vector<size_t> newshape){
+        Tensor new_tensor = Tensor();
+        new_tensor.shape = newshape;
+        new_tensor.dtype = dtype;
+        new_tensor.device = device;
+        new_tensor.device_id = device_id;
+        new_tensor.data_size_in_bytes = get_dtype_bytes(dtype);
+        for (size_t i = 0; i < newshape.size(); i++){
+            new_tensor.data_size_in_bytes *= newshape[i];
+        }
+        if (new_tensor.data_size_in_bytes > data_size_in_bytes){
+            throw std::runtime_error("cloneWithFalseReshape must have same or smaller size, to avoid memory access issues");
+        }
+        new_tensor.data = data;
+        return new_tensor;
+    }
+
     template <typename T>
     Tensor(std::vector<size_t> shape, std::vector<T> data, DEVICE device=DEVICE::CPU, int device_id=0){
         this->shape = shape;
@@ -311,9 +346,11 @@ struct Tensor{
             this->data_size_in_bytes *= shape[i];
         }
         posix_memalign(&this->data ,64,this->data_size_in_bytes);
-        for (size_t i = 0; i < data.size(); i++){
-            ((T*)this->data)[i] = data[i];
-        }
+        // for (size_t i = 0; i < data.size(); i++){
+        //     ((T*)this->data)[i] = data[i];
+        // }
+        memcpy(this->data, data.data(), this->data_size_in_bytes);
+
     }
 
     Tensor(const Tensor& other){
@@ -391,16 +428,16 @@ struct Tensor{
 
     Tensor relusquared();
     Tensor sigmoidmul(Tensor& other, Tensor& residual);
-    Tensor lerp(Tensor& A, Tensor& B);
+    Tensor lerp(Tensor& A, Tensor& B, Tensor& C);
     Tensor swishmul(Tensor& other);
     Tensor matmul(Tensor& other, Tensor residual = Tensor());
     Tensor matmul(Tensor &Art, Tensor &Aot, Tensor &Bt, Tensor residual = Tensor());
-    Tensor normalize(Tensor& weight, Tensor& bias, size_t heads = 1, float epsilon=1e-5);
+    Tensor normalize(Tensor& weight, Tensor& bias, Tensor& result, size_t heads = 1, float epsilon=1e-5);
     
-    Tensor wkv5(Tensor& r, Tensor& k, Tensor& v, Tensor& w, Tensor& u);
+    Tensor wkv5(Tensor& r, Tensor& k, Tensor& v, Tensor& w, Tensor& u, Tensor& y);
 
     Tensor operator[](size_t index);
-    Tensor operator[](std::vector<std::vector<size_t>> index);
+    Tensor gather(std::vector<std::vector<size_t>> index, Tensor result);
     
     void copyfrom(Tensor other){
         if (device == DEVICE::CUDA){

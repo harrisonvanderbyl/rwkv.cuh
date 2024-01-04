@@ -8,9 +8,8 @@ void normalize_cpu_kernel(void* input, void* weight, void* bias, void* output, f
 // layernorm kernel
 
 
-inline Tensor Tensor::normalize(Tensor& weight, Tensor& bias, size_t heads, float eps)
+inline Tensor Tensor::normalize(Tensor& weight, Tensor& bias, Tensor& result, size_t heads, float eps)
 {
-    Tensor result = Tensor(this->shape, this->dtype, this->device, this->device_id);
 
     auto lastshape = this->shape.back();
     auto headshape = lastshape / heads;
