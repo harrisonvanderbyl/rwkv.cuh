@@ -5,14 +5,20 @@
 #include <cuda_bf16.h>
 #include "tensor/tensor.h"
 
-__global__ void matmulfp_kernal(float* A, float*B, float*C, size_t INSHAPE, size_t OUTSHAPE){
+__global__ void matmulfp_kernal(float*  A, float* B, float* C, size_t INSHAPE, size_t OUTSHAPE, size_t CHUNKSIZE){
     size_t bbt = blockIdx.x * blockDim.x + threadIdx.x;
     size_t i = blockIdx.y * blockDim.y + threadIdx.y;
     size_t k = blockIdx.z * blockDim.z + threadIdx.z;
 
-    float out = A[i * INSHAPE + k] * B[bbt * INSHAPE + k];
+    float acc = 0;
 
-    atomicAdd(C + bbt * OUTSHAPE + i, out);
+    for (size_t j = 0; j < CHUNKSIZE; j++)
+    {
+        acc += (A[i * INSHAPE + k*CHUNKSIZE + j] * B[bbt * INSHAPE + k*CHUNKSIZE + j]);
+    }
+
+
+    atomicAdd(C + bbt * OUTSHAPE + i, (acc));
 }
 
 __global__ void matmulfp_kernal(__nv_bfloat16*  A, __nv_bfloat16* B, __nv_bfloat16* C, size_t INSHAPE, size_t OUTSHAPE, size_t CHUNKSIZE){
@@ -20,15 +26,30 @@ __global__ void matmulfp_kernal(__nv_bfloat16*  A, __nv_bfloat16* B, __nv_bfloat
     size_t i = blockIdx.y * blockDim.y + threadIdx.y;
     size_t k = blockIdx.z * blockDim.z + threadIdx.z;
 
-    __nv_bfloat16 acc = 0;
+    float acc = 0;
 
     for (size_t j = 0; j < CHUNKSIZE; j++)
     {
-        acc += A[i * INSHAPE + k*CHUNKSIZE + j] * B[bbt * INSHAPE + k*CHUNKSIZE + j];
+        acc += __bfloat162float(A[i * INSHAPE + k*CHUNKSIZE + j] * B[bbt * INSHAPE + k*CHUNKSIZE + j]);
     }
 
 
-    atomicAdd(C + bbt * OUTSHAPE + i, acc);
+    atomicAdd(C + bbt * OUTSHAPE + i, __float2bfloat16(acc));
+}
+
+__global__ void matmul8_kernal(uint8_t* A, float*B, float*C, float* range, float* offset, size_t INSHAPE, size_t OUTSHAPE, size_t CHUNKSIZE){
+    size_t bbt = blockIdx.x * blockDim.x + threadIdx.x;
+    size_t i = blockIdx.y * blockDim.y + threadIdx.y;
+    size_t k = blockIdx.z * blockDim.z + threadIdx.z;
+
+    float acc = 0;
+
+    for (size_t j = 0; j < CHUNKSIZE; j++)
+    {
+        acc += ((float(A[i * INSHAPE + k*CHUNKSIZE + j]* range[i] )+ offset[i]) * B[bbt * INSHAPE + k*CHUNKSIZE + j]);
+    }
+
+    atomicAdd(C + bbt * OUTSHAPE + i, (acc ));
 }
 
 template <typename T>
@@ -98,15 +119,26 @@ __global__ void wkvatt(size_t TT, size_t CH, T *kk, T *vv, T *rr, T *ww, T *uu, 
 
 void matmul_cuda_kernal(void* A, void* B, void* C, size_t BBT, size_t INSHAPE, size_t OUTSHAPE,TENSORTYPE dtype){
     size_t CHUNKSIZE = 16;
-    dim3 dimBlock(1, 8, 16);
-    dim3 dimGrid(BBT, OUTSHAPE/8, (INSHAPE/CHUNKSIZE)/16);
+
+    dim3 dimBlock(1, 4, 4);
+    dim3 dimGrid(BBT, OUTSHAPE/4, (INSHAPE/CHUNKSIZE)/4);
     if (dtype == TENSORTYPE::kFLOAT_32)
-        matmulfp_kernal<<<dimGrid, dimBlock>>>((float *)A, (float *)B, (float *)C, INSHAPE, OUTSHAPE);
+        matmulfp_kernal<<<dimGrid, dimBlock>>>((float *)A, (float *)B, (float *)C, INSHAPE, OUTSHAPE, CHUNKSIZE);
     else if (dtype == TENSORTYPE::kBFLOAT_16)
         matmulfp_kernal<<<dimGrid, dimBlock>>>((__nv_bfloat16 *)A, (__nv_bfloat16 *)B, (__nv_bfloat16 *)C, INSHAPE, OUTSHAPE, CHUNKSIZE);
     else
         throw std::runtime_error("matmul not implemented for this dtype");
 }
+
+void matmul8_cuda_kernal(u_char* A, void* B, void* C, void* Ao, void* Ar, size_t BBT, size_t INSHAPE, size_t OUTSHAPE){  
+     size_t CHUNKSIZE = 16;
+    dim3 dimBlock(1, 4, 4);
+    dim3 dimGrid(BBT, OUTSHAPE/4, (INSHAPE/CHUNKSIZE)/4);
+    matmul8_kernal<<<dimGrid, dimBlock>>>(A, (float *)B, (float *)C, (float *)Ar, (float *)Ao, INSHAPE, OUTSHAPE, CHUNKSIZE);
+}
+
+
+
 
 void  wkv5_cuda_kernel(void* kk, void* vv, void* ww, void* uu, void* rr, void* ss, void* out, size_t T, size_t B, size_t C, size_t H, TENSORTYPE dtype){
     dim3 dimBlock(H);

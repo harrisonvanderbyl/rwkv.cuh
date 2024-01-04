@@ -6,6 +6,8 @@
 
 
 void matmul8_cpu_kernal(u_char* A, void* B, void* C, void* Ao, void* Ar, size_t BBT, size_t INSHAPE, size_t OUTSHAPE);
+void matmul8_cuda_kernal(u_char* A, void* B, void* C, void* Ao, void* Ar, size_t BBT, size_t INSHAPE, size_t OUTSHAPE);
+
 void matmul_cpu_kernal(void* A, void* B, void* C, size_t BBT, size_t INSHAPE, size_t OUTSHAPE, TENSORTYPE dtype);
 void matmul_cuda_kernal(void* A, void* B, void* C, size_t BBT, size_t INSHAPE, size_t OUTSHAPE,TENSORTYPE dtype);
 
@@ -43,8 +45,7 @@ inline Tensor Tensor::matmul(Tensor &Art, Tensor &Aot,
     }
     else
     {
-        // TODO: implement gpu matmul
-        throw std::runtime_error("not implemented");
+        matmul8_cuda_kernal((u_char *)A, (void *)B, (void *)C, (void *)Ao, (void *)Ar, BB * T, INSHAPE, OUTSHAPE);
     }
 
     return Ct;

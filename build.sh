@@ -12,7 +12,7 @@ export HEADERFILES="$HEADERFILES -I./include"
 # export DEBUG="-g -G"
 
 # include release symbols
-export RELEASE="-O3 --use_fast_math --forward-unknown-to-host-compiler -ffast-math"
+export RELEASE="-O3 --use_fast_math --forward-unknown-to-host-compiler -ffast-math -Xptxas -O3"
 
 nvcc ./rwkv.cu ./cpuops.cpp  -I$HEADERFILES -L$LIBRARYFILES $DEBUG $RELEASE -o ./rwkv -arch=sm_80 
 # g++ ./rwkv.cu.cpp ./cpuops.cpp  -I./include -o ./rwkvcpu -pthread

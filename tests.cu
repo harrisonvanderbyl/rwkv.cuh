@@ -345,7 +345,7 @@ int main(){
     std::cout << "wkvtest cuda bf16" << std::endl;
     std::cout << out_bf16_cuda << std::endl;
     std::cout << wkvtest_bf16_cuda << std::endl;
-    exit(0);
+    
     // matmultest 
     std::cout << "matmultest" << std::endl;
     Tensor matmultest = {{256,256}};
@@ -401,26 +401,26 @@ int main(){
 
     // matmultest cuda
 
-    // Tensor a = {{65536,204256},TENSORTYPE::kBFLOAT_16};
-    // for(size_t i = 0; i < 204256*65536; i++){
-    //     ((bfloat16*)a.data)[i] = bfloat16(0.25*float(rand())/float(RAND_MAX));
-    // }
+    Tensor a = {{4096,2048},TENSORTYPE::kBFLOAT_16};
+    for(size_t i = 0; i < 2048*4096; i++){
+        ((bfloat16*)a.data)[i] = bfloat16(0.25*float(rand())/float(RAND_MAX));
+    }
 
-    // Tensor b = {{1,10,204256},TENSORTYPE::kBFLOAT_16};
-    // for(size_t i = 0; i < 10*204256; i++){
-    //     ((bfloat16*)b.data)[i] =  bfloat16(0.25*float(rand())/float(RAND_MAX));;
-    // }
+    Tensor b = {{1,18,2048},TENSORTYPE::kBFLOAT_16};
+    for(size_t i = 0; i < 18*2048; i++){
+        ((bfloat16*)b.data)[i] =  bfloat16(0.25*float(rand())/float(RAND_MAX));;
+    }
 
-    // auto outcpu = a.matmul(b);
+    auto outcpu = a.matmul(b);
 
-    // std::cout << outcpu;
+    std::cout << outcpu;
 
-    // auto acuda = a.cuda();
-    // auto bcuda = b.cuda();
+    auto acuda = a.cuda();
+    auto bcuda = b.cuda();
 
-    // auto outcuda = acuda.matmul(bcuda);
+    auto outcuda = acuda.matmul(bcuda);
 
-    // std::cout << outcuda.cpu();
+    std::cout << outcuda;
 
     return 0;
 }
