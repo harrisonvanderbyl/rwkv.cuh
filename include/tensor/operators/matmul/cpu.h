@@ -5,9 +5,10 @@
 #include "tensor/tensor.h"
 #include "tensor/intrinsics/intrinsics.h"
 #include "tensor/operators/matmul/threading.h"
+#include "immintrin.h"
 
 
-    __attribute__((target("avx2","fma","avx512f"))) 
+    __attribute__((target("avx2","fma","avx512f","avx512vl"))) 
     void dopartial(MatMulJob job)
     {
         // do the work
@@ -36,30 +37,44 @@
                     {
                         auto Aoio = Aoio1[i & 7]/Ario1[i & 7];
 
-                        const auto IAINSHAPE = A + i * INSHAPE;
+                        const auto IAINSHAPE = (A + i * INSHAPE);
 
-                        auto sum1 = _mm256_set1_ps(0.0);
-                        auto sum2 = _mm256_set1_ps(0.0);
+                        auto s1  =_mm512_setzero_ps();
+                        auto s11 =_mm512_setzero_ps();
+                        auto s12 =_mm512_setzero_ps();
+                        auto s13 =_mm512_setzero_ps();
+                        auto s14 =_mm512_setzero_ps();
+                        auto s15 =_mm512_setzero_ps();
+                        auto s16 =_mm512_setzero_ps();
+                        auto s17 =_mm512_setzero_ps();
+                        auto s2 = _mm512_setzero_ps();
                         for (uint32_t k = 0; k < INSHAPE; k += 16)
                         {
                             // avx2
-                            auto w = _mm256_cvtepu8_epi32(_mm_loadu_si128((__m128i *)(IAINSHAPE + k))); // Load the input uint8_t vector
-                            // convert uint32_t to float32x8_t
-                            auto u = _mm256_cvtepi32_ps(w) + Aoio; // Convert uint32_t to float32_t
-                            // Load the input float vector
-                            // Perform the multiplication with inp vector
-                            sum1 = _mm256_fmadd_ps(u, _mm256_loadu_ps(((float *)B) + bbt * INSHAPE + k), sum1);
-
-                            auto w1 = _mm256_cvtepu8_epi32(_mm_loadu_si128((__m128i *)(IAINSHAPE + k + 8))); // Load the input uint8_t vector
-
-                            auto u1 = _mm256_cvtepi32_ps(w1) + Aoio; // Convert uint32_t to float32_t
-
-                            sum2 = _mm256_fmadd_ps(u1, _mm256_loadu_ps(((float *)B) + bbt * INSHAPE + k + 8), sum2);
+                            auto unc = (uint16_t*)( IAINSHAPE + k );
+                            auto inp = _mm512_loadu_ps(((float *)B) + bbt * INSHAPE + k);
+                            s1 = _mm512_mask_add_ps(s1 ,unc[0], inp,s1 );
+                            s11= _mm512_mask_add_ps(s11,unc[1], inp,s11);
+                            s12= _mm512_mask_add_ps(s12,unc[2], inp,s12);
+                            s13= _mm512_mask_add_ps(s13,unc[3], inp,s13);
+                            s14= _mm512_mask_add_ps(s14,unc[4], inp,s14);
+                            s15= _mm512_mask_add_ps(s15,unc[5], inp,s15);
+                            s16= _mm512_mask_add_ps(s16,unc[6], inp,s16);
+                            s17= _mm512_mask_add_ps(s17,unc[7], inp,s17);
+                            s2 = _mm512_add_ps(inp, s2);
                         }
 
-                        sum1 = _mm256_add_ps(sum1, sum2);
 
-                        zz1[i & 7] += (sum1[0] + sum1[1] + sum1[2] + sum1[3] + sum1[4] + sum1[5] + sum1[6] + sum1[7])*Ario1[i & 7];
+                        s17+=s17+s16;
+                        s17+=s17+s15;
+                        s17+=s17+s14;
+                        s17+=s17+s13;
+                        s17+=s17+s12;
+                        s17+=s17+s11;
+                        s17+=s17+s1;
+
+                        s2 *= Aoio;
+                        zz1[i & 7] += (_mm512_reduce_add_ps(s2+s17))*Ario1[i & 7];
                     }
 
                     _mm256_storeu_ps(

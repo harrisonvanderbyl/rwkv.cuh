@@ -50,6 +50,42 @@ void Quantize(torch::Tensor &At, torch::Tensor &Art, torch::Tensor &Aot, torch::
             *(Ao + i) = *(Ao + i) + offset;
             
         }
+
+        for (j = 0; j < N; j += 8)
+        {
+            u_char* base = (Aq + i * N + j);
+            u_int8_t tofix[8] = {0,0,0,0,0,0,0,0};
+            for (u_int8_t z = 0; z < 8; z++){
+                for (u_int8_t k = 0; k < 8; k++)
+                {
+                    u_char bit = (base[z] & (1 << k)) >> k;
+
+                    tofix[k] = tofix[k] | (bit << (z));
+
+                }
+            }
+
+            for (u_int8_t z = 0; z < 8; z++){
+                base[z] = tofix[z];
+            }
+        }
+        for (j = 0; j < N; j += 16)
+        {
+            // shuffle
+            u_char* base = (Aq + i * N + j);
+            u_int8_t tofix[16] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0};
+            for (u_int8_t z = 0; z < 16; z+=2){
+                
+                tofix[z] = base[z/2];
+                tofix[z+1] = base[z/2 + 8];
+                
+            }
+
+            for (u_int8_t z = 0; z < 16; z++){
+                base[z] = tofix[z];
+            }
+
+        }
     }
 }
 
