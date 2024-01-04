@@ -14,7 +14,8 @@ inline Tensor Tensor::swishmul(Tensor& other){
     if (this->device == DEVICE::CPU){
         swishmul_cpu_kernel(this->data, other.data, output.data, size, dtype);
     }
-    else{
+    else CUDAONLY
+    {
         swishmul_cuda_kernel(this->data, other.data, output.data, size, dtype);
     }
     return output;

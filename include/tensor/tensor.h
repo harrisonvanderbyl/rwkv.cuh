@@ -3,9 +3,26 @@
 #define TENSOR_TENSOR_H
 #include <iostream>
 #include "nlohmann/json.hpp"
+
+/*
+Define 
+#pragma CUDAONLY
+function() {
+    // code
+}
+to remove the function from the CPU build
+*/
+#if defined(__CUDACC__)
+#define CUDAONLY
+#else
+#define CUDAONLY if (false)
+
+#endif
+
 // backtrace
 #if defined(__CUDACC__) || defined(__HIPCC__)
 #include "cuda_runtime.h"
+
 #endif
 #include "malloc.h"
 // define float16 and bfloat16
@@ -21,8 +38,8 @@ struct float16{
 #define bfloat16 __nv_bfloat16
 #else
 struct bfloat16;
-float bfloat16_to_float32(bfloat16 value);
-bfloat16 float32_to_bfloat16(float value);
+static float bfloat16_to_float32(bfloat16 value);
+static bfloat16 float32_to_bfloat16(float value);
 struct bfloat16{
     uint16_t value;
     operator float() const {return bfloat16_to_float32(*this);}
@@ -40,13 +57,13 @@ struct bfloat16{
 
 
 
-float bfloat16_to_float32(bfloat16 value){
+static float bfloat16_to_float32(bfloat16 value){
     // cast as uint16_t, then cast as float32, then bitshift 16 bits to the left, then cast as float32
     uint32_t inter (uint32_t((uint16_t)value.value) << 16);
     return *((float*)&inter);
 }
 
-bfloat16 float32_to_bfloat16(float value){
+static bfloat16 float32_to_bfloat16(float value){
     // cast as uint32_t, then bitshift 16 bits to the right, then cast as uint16_t, then cast as bfloat16
     uint32_t inter (uint32_t(*((uint32_t*)&value)) >> 16);
     return {
@@ -54,16 +71,17 @@ bfloat16 float32_to_bfloat16(float value){
     };
 }
 
-#define cudaMemcpy(...) throw std::runtime_error("CUDA not enabled")
-#define cudaMalloc(...) throw std::runtime_error("CUDA not enabled")
-#define cudaMemset(...) throw std::runtime_error("CUDA not enabled")
+#define cudaMemcpy(...) throw std::runtime_error("Not compiled with cuda")
+#define cudaMalloc(...) throw std::runtime_error("Not compiled with cuda")
+#define cudaMemset(...) throw std::runtime_error("Not compiled with cuda")
 #define cudaMallocHost(pointer, size) *pointer = malloc(size)
 
 
 
 #endif
 
-std::ostream& operator<<(std::ostream& os, const bfloat16& value){
+
+static std::ostream& operator<<(std::ostream& os, const bfloat16& value){
     return os << "<" << float(value) << ">";
 }
 // bf16 chevrons for std::cout

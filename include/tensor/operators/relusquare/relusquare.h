@@ -13,7 +13,8 @@ inline Tensor Tensor::relusquared(){
     if (device == DEVICE::CPU){
         relusquare_cpu_kernel(this->data, output.data, size, dtype);
     }
-    else if (device == DEVICE::CUDA){
+    else CUDAONLY
+    {
     
         relusquare_cuda_kernel(this->data, output.data, size, dtype);
         

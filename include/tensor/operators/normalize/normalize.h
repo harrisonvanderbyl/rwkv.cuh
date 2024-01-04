@@ -18,12 +18,9 @@ inline Tensor Tensor::normalize(Tensor& weight, Tensor& bias, Tensor& result, si
 
         normalize_cpu_kernel(this->data, weight.data, bias.data, result.data, eps, lastshape, headshape, this->get_element_count(), this->dtype);
 
-    } else if (this->device == DEVICE::CUDA){
-        
+    } else CUDAONLY
+    {        
         normalize_cuda_kernel(this->data, weight.data, bias.data, result.data, eps, lastshape, headshape, this->get_element_count(), this->dtype);
-
-    } else {
-        throw std::runtime_error("Device not implemented");
     }
 
     return result;

@@ -14,7 +14,6 @@ void matmul_cuda_kernal(void* A, void* B, void* C, size_t BBT, size_t INSHAPE, s
 void wkv5_cpu_kernel(void* kk, void* vv, void* ww, void* uu, void* rr, void* ss, void* out, size_t T, size_t B, size_t C, size_t H, TENSORTYPE dtype);
 void wkv5_cuda_kernel(void* kk, void* vv, void* ww, void* uu, void* rr, void* ss, void* out, size_t T, size_t B, size_t C, size_t H, TENSORTYPE dtype);
 
-
 inline Tensor Tensor::matmul(Tensor &Art, Tensor &Aot,
                       Tensor &Bt, Tensor Ct)
 {
@@ -43,9 +42,12 @@ inline Tensor Tensor::matmul(Tensor &Art, Tensor &Aot,
     {
         matmul8_cpu_kernal((u_char *)A, (void *)B, (void *)C, (void *)Ao, (void *)Ar, BB * T, INSHAPE, OUTSHAPE);
     }
-    else
+    else CUDAONLY
     {
+
+        
         matmul8_cuda_kernal((u_char *)A, (void *)B, (void *)C, (void *)Ao, (void *)Ar, BB * T, INSHAPE, OUTSHAPE);
+       
     }
 
     return Ct;
@@ -75,9 +77,13 @@ inline Tensor Tensor::matmul(Tensor &Bt, Tensor Ct)
 
     if(Bt.device==DEVICE::CPU){
         matmul_cpu_kernal((void *)A, (void *)B, (void *)C, BB * T, INSHAPE, OUTSHAPE, Bt.dtype);
-    }
-    else{
+    } 
+    else CUDAONLY
+    {
+    
+        
         matmul_cuda_kernal((void *)A, (void *)B, (void *)C, BB * T, INSHAPE, OUTSHAPE, Bt.dtype);
+        
     }
 
     return Ct;
@@ -104,9 +110,12 @@ inline Tensor Tensor::wkv5(Tensor &r, Tensor &k, Tensor &v, Tensor &w, Tensor &u
     {
         wkv5_cpu_kernel(kk, vv, ww, uu, rr, ss, out, T, B, C, H, dtype);
     }
-    else
+    else CUDAONLY
     {
+
+        
         wkv5_cuda_kernel(kk, vv, ww, uu, rr, ss, out, T, B, C, H, dtype);
+        
     }
 
     return y;

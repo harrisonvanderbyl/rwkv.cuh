@@ -7,7 +7,7 @@
 #include "tensor/operators/matmul/threading.h"
 
 
-    __attribute__((target("avx2","fma","avx512f"))) 
+    __attribute__((target("avx2","fma"))) 
     void dopartial(MatMulJob job)
     {
         // do the work
@@ -39,30 +39,23 @@
                         const auto IAINSHAPE = A + i * INSHAPE;
 
                         auto sum1 = _mm256_set1_ps(0.0);
-                        auto sum2 = _mm256_set1_ps(0.0);
-                        for (uint32_t k = 0; k < INSHAPE; k += 16)
+                        auto s2 = _mm256_set1_ps(0.0);
+                        for (uint32_t k = 0; k < INSHAPE; k += 8)
                         {
                             // avx2
-                            auto w = _mm256_cvtepu8_epi32(_mm_loadu_si128((__m128i *)(IAINSHAPE + k))); // Load the input uint8_t vector
-                            // convert uint32_t to float32x8_t
-                            auto u = _mm256_cvtepi32_ps(w) + Aoio; // Convert uint32_t to float32_t
-                            // Load the input float vector
-                            // Perform the multiplication with inp vector
-                            sum1 = _mm256_fmadd_ps(u, _mm256_loadu_ps(((float *)B) + bbt * INSHAPE + k), sum1);
-
-                            auto w1 = _mm256_cvtepu8_epi32(_mm_loadu_si128((__m128i *)(IAINSHAPE + k + 8))); // Load the input uint8_t vector
-
-                            auto u1 = _mm256_cvtepi32_ps(w1) + Aoio; // Convert uint32_t to float32_t
-
-                            sum2 = _mm256_fmadd_ps(u1, _mm256_loadu_ps(((float *)B) + bbt * INSHAPE + k + 8), sum2);
+                            auto w = _mm256_cvtepu8_epi32(_mm_lddqu_si128((__m128i *)(IAINSHAPE + k))); // Load the input uint8_t vector
+                            auto u = _mm256_cvtepi32_ps(w) ; // Convert uint32_t to float32_t
+                            auto v = _mm256_load_ps(((float *)B) + bbt * INSHAPE + k);
+                            sum1 = _mm256_fmadd_ps(u, v, sum1);
+                            s2 = _mm256_add_ps(s2,v);
                         }
 
-                        sum1 = _mm256_add_ps(sum1, sum2);
+                        sum1 += s2 * + Aoio;
 
                         zz1[i & 7] += (sum1[0] + sum1[1] + sum1[2] + sum1[3] + sum1[4] + sum1[5] + sum1[6] + sum1[7])*Ario1[i & 7];
                     }
 
-                    _mm256_storeu_ps(
+                    _mm256_store_ps(
                         flp(C) + bbt * OUTSHAPE + dii + b,
                         zz1);
                 }
@@ -179,6 +172,7 @@ printf("dopartialfp not implemented for this architecture");
 
 ARMONLY(
     
+    __attribute__((target("neon")))
     void dopartial(MatMulJob job)
     {
         // do the work
@@ -197,10 +191,11 @@ ARMONLY(
             {
                 for (size_t b = 0; b < 16; b += 4)
                 {
-                    const auto Ario1 = LOAD(Ar + dii + b);
-                    const auto Aoio1 = DIVIDE(LOAD(Ao + dii + b), Ario1);
+                    const auto Ario1 = *(Ar + dii + b);
+                    const auto Aoio1 = *(Ao + dii + b);
 
-                    auto zz1 = SET1(0.0);
+                    // set zero neon
+                    auto zz1 = vdupq_n_f32(0.0);
 
                     for (uint32_t i = dii + b; i < dii + b + 4; i += 1)
                     {
@@ -208,8 +203,8 @@ ARMONLY(
 
                         const auto IAINSHAPE = A + i * INSHAPE;
 
-                        auto sum1 = SET1(0.0);
-                        auto sum2 = SET1(0.0);
+                        auto sum1 = vdupq_n_f32(0.0);
+                        auto sum2 = vdupq_n_f32(0.0);
                         // remember to change this to load from residual
 
                         for (uint32_t k = 0; k < INSHAPE; k += 8)
@@ -223,110 +218,23 @@ ARMONLY(
                             auto u32_high_vec = vcvtq_f32_u32(vmovl_u16(vget_high_u16(u16_vec))) + Aoio; // Extract upper part and convert to uint32_t
                             // Load the input float vector
                             // Perform the multiplication with inp vector
-                            sum1 = MULTADD(u32_low_vec, vld1q_f32(B + bbt * INSHAPE + k), sum1);
-                            sum2 = MULTADD(u32_high_vec, vld1q_f32(B + bbt * INSHAPE + k + 4), sum2);
+                            sum1 = vmlaq_f32(u32_low_vec, vld1q_f32(B + bbt * INSHAPE + k), sum1);
+                            sum2 = vmlaq_f32(u32_high_vec, vld1q_f32(B + bbt * INSHAPE + k + 4), sum2);
                         }
 
-                        sum1 = ADD(sum1, sum2);
+                        sum1 = vaddq_f32(sum1, sum2);
 
-                        zz1[i & 3] = REDUCE(sum1);
+                        zz1[i & 3] = zz1[i & 3] + sum1[0] + sum1[1] + sum1[2] + sum1[3];
                     }
 
-                    STORE(
-                        (void *)(C + bbt * OUTSHAPE + dii + b),
+                    vst1q_f32(
+                        (C + bbt * OUTSHAPE + dii + b),
                         zz1 * Ario1);
                 }
             }
         }
     }
 
-    // #endif
-    /*
-#elif defined(__ARM_NEON) || defined(__ARM_NEON__)
-    for (size_t bbt = 0; bbt < Batch; bbt += 1)
-    {
-        for (size_t dii = ii; dii < OUTSHAPE; dii += 16 * 16)
-        {
-            for (size_t b = 0; b < 16; b += 4)
-            {
-                const auto Ario1 = LOAD(Ar + dii + b);
-                const auto Aoio1 = DIVIDE(LOAD(Ao + dii + b), Ario1);
-
-                auto zz1 = SET1(0.0);
-
-                for (uint32_t i = dii + b; i < dii + b + 4; i += 1)
-                {
-
-                    const auto IAINSHAPE = flp(A) + i * INSHAPE;
-
-                    auto sum1 = SET1(0.0);
-                    auto sum2 = SET1(0.0);
-
-                    for (uint32_t k = 0; k < INSHAPE; k += 8)
-                    {
-                        sum1 = MULTADD(vld1q_f32(IAINSHAPE+k), vld1q_f32(flp(B) + bbt * INSHAPE + k), sum1);
-                        sum2 = MULTADD(vld1q_f32(IAINSHAPE+k), vld1q_f32(flp(B) + bbt * INSHAPE + k + 4), sum2);
-                    }
-
-                    sum1 = ADD(sum1, sum2);
-
-                    zz1[i & 3] = REDUCE(sum1);
-                }
-
-                STORE(
-                    (void *)(C + bbt * OUTSHAPE + dii + b),
-                    zz1 * Ario1);
-            }
-        }
-    }
-#else
-    if(dtype==TENSORTYPE::kFLOAT_32){
-        for (size_t bbt = 0; bbt < Batch; bbt += 1)
-        {
-            for (size_t dii = ii; dii < OUTSHAPE; dii += 16 * 16)
-            {
-                for (size_t b = 0; b < 16; b += 8)
-                {
-                    for (uint32_t i = dii + b; i < dii + b + 8; i += 1)
-                    {
-                        const auto IAINSHAPE = flp(A) + i * INSHAPE;
-
-                        auto sum1 = SET1(0.0);
-                        for (uint32_t k = 0; k < INSHAPE; k += 1)
-                        {
-                            // Load the input float vector
-                            // Perform the multiplication with inp vector
-                            sum1 += IAINSHAPE[k] * LOAD((float *)B + bbt * INSHAPE + k);
-                        }
-
-                        STORE(
-                            (void *)(((float *)C) + bbt * OUTSHAPE + i),
-                            sum1);
-                    }
-                }
-            }
-        }
-    }
-    else{
-        for (size_t bbt = 0; bbt < Batch; bbt += 1)
-        {
-            for (size_t dii = ii; dii < OUTSHAPE; dii += 16 * 16)
-            {
-                for (uint32_t i = dii; i < dii + 16; i += 1)
-                {
-
-                    float sum1 = 0.0f;
-                    for (uint32_t k = 0; k < INSHAPE; k += 1)
-                    {
-                        sum1 += float(bflp(A)[i * INSHAPE + k]) * float(((bfloat16 *)B)[bbt * INSHAPE + k] );
-                    }
-
-                    ((bfloat16 *)C)[bbt * OUTSHAPE + i] = bfloat16(sum1);
-                }
-            }
-            
-        }
-    }*/
 )
 
 

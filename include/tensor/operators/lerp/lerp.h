@@ -16,7 +16,8 @@ inline Tensor Tensor::lerp(Tensor& A, Tensor& B, Tensor& output){
     if (this->device == DEVICE::CPU){
         lerp_cpu_kernel(this->data, A.data, B.data, output.data, size, loopsize, dtype);
     }
-    else{
+    else CUDAONLY
+    {
         lerp_cuda_kernel(this->data, A.data, B.data, output.data, size, loopsize, dtype);
     }  
     return output;

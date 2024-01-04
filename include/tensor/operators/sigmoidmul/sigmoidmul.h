@@ -14,7 +14,8 @@ inline Tensor Tensor::sigmoidmul(Tensor& other, Tensor& residual){
     if (this->device == DEVICE::CPU){
         sigmoidmul_cpu_kernel(this->data, other.data, residual.data, output.data, size, dtype);
     }
-    else{
+    else CUDAONLY
+    {
         sigmoidmul_cuda_kernel(this->data, other.data, residual.data, output.data, size, dtype);
     }
     return output;

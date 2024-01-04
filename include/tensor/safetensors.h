@@ -107,7 +107,7 @@ using json = nlohmann::json;
                 metas = std::unordered_map<std::string, const metadata_t>(metadatas.size());
                 // allocate in a way that prevents it from being freed
                 // storage = new char[tensors_size];
-                posix_memalign((void**)&storage, 64, tensors_size);
+                posix_memalign((void**)&storage, 128, tensors_size);
                 
 
                 // Read the remaining content
