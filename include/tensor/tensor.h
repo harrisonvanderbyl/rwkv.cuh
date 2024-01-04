@@ -6,6 +6,7 @@
 #if defined(__CUDACC__) || defined(__HIPCC__)
 #include "cuda_runtime.h"
 #endif
+#include "malloc.h"
 // define float16 and bfloat16
 // typedef unsigned short float16;
 // typedef unsigned short bfloat16;
@@ -23,7 +24,6 @@ float bfloat16_to_float32(bfloat16 value);
 bfloat16 float32_to_bfloat16(float value);
 struct bfloat16{
     uint16_t value;
-    operator uint16_t() const {return value;}
     operator float() const {return bfloat16_to_float32(*this);}
     bfloat16(double value) {this->value = float32_to_bfloat16((float)value);}
     bfloat16(float value) {this->value = float32_to_bfloat16(value);}
@@ -34,19 +34,20 @@ struct bfloat16{
     // bfloat16 operator = (uint16_t value) {this->value = value; return *this;}
     // bfloat16 operator = (double value) {this->value = float32_to_bfloat16((float)value); return *this;}
     bfloat16 operator + (bfloat16 value) {return bfloat16(float(*this) + float(value));}
+    
 };
 
 
 
 float bfloat16_to_float32(bfloat16 value){
     // cast as uint16_t, then cast as float32, then bitshift 16 bits to the left, then cast as float32
-    size_t inter (size_t((uint16_t)value.value) << 16);
+    uint32_t inter (uint32_t((uint16_t)value.value) << 16);
     return *((float*)&inter);
 }
 
 bfloat16 float32_to_bfloat16(float value){
     // cast as uint32_t, then bitshift 16 bits to the right, then cast as uint16_t, then cast as bfloat16
-    size_t inter (size_t(*((uint32_t*)&value)) >> 16);
+    uint32_t inter (uint32_t(*((uint32_t*)&value)) >> 16);
     return {
         (uint16_t)inter
     };
@@ -55,7 +56,16 @@ bfloat16 float32_to_bfloat16(float value){
 #define cudaMemcpy(...) throw std::runtime_error("CUDA not enabled")
 #define cudaMalloc(...) throw std::runtime_error("CUDA not enabled")
 #define cudaMallocHost(pointer, size) *pointer = malloc(size)
+
+
+
 #endif
+
+std::ostream& operator<<(std::ostream& os, const bfloat16& value){
+    return os << "<" << float(value) << ">";
+}
+// bf16 chevrons for std::cout
+
 
 enum TENSORTYPE
 {
@@ -239,7 +249,7 @@ struct Tensor{
     TENSORTYPE dtype;
     DEVICE device;
     int device_id;
-    void* data;
+    void* data = nullptr;
     Tensor(){
         shape = std::vector<size_t>();
         data_size_in_bytes = 0;
@@ -265,8 +275,9 @@ struct Tensor{
         } else if (device == DEVICE::VULKAN){
             cudaMalloc(&this->data, this->data_size_in_bytes);
         } else {
-            // this->data = malloc(this->data_size_in_bytes);
-            cudaMallocHost(&this->data,this->data_size_in_bytes);
+            posix_memalign(&this->data,64,this->data_size_in_bytes);
+            // cudaMallocHost(&this->data,this->data_size_in_bytes);
+
             
             assert(this->data != nullptr);
 
@@ -299,7 +310,7 @@ struct Tensor{
         for (size_t i = 0; i < shape.size(); i++){
             this->data_size_in_bytes *= shape[i];
         }
-        this->data = malloc(this->data_size_in_bytes);
+        posix_memalign(&this->data ,64,this->data_size_in_bytes);
         for (size_t i = 0; i < data.size(); i++){
             ((T*)this->data)[i] = data[i];
         }
@@ -343,6 +354,33 @@ struct Tensor{
         }
     }
 
+    Tensor cpu(){
+        if (device == DEVICE::CPU){
+            return *this;
+        } else {
+            Tensor new_tensor = Tensor(shape, dtype, DEVICE::CPU, device_id);
+            cudaMemcpy(new_tensor.data, data, data_size_in_bytes, cudaMemcpyDeviceToHost);
+            return new_tensor;
+        }
+    }
+
+    Tensor float32(){
+        if (dtype == TENSORTYPE::kFLOAT_32){
+            return *this;
+        } else if (dtype == TENSORTYPE::kBFLOAT_16){
+            Tensor new_tensor = Tensor(shape, TENSORTYPE::kFLOAT_32, device, device_id);
+
+            for (size_t i = 0; i < get_element_count(); i++){
+                ((float*)new_tensor.data)[i] = (float)((bfloat16*)data)[i];
+            }
+            
+            return new_tensor;
+        }
+        else{
+            throw std::runtime_error("float32 only implemented for float and bfloat16");
+        }
+    }
+
     size_t get_element_count() const {
         size_t count = 1;
         for (size_t i = 0; i < shape.size(); i++){
@@ -358,9 +396,12 @@ struct Tensor{
     Tensor matmul(Tensor& other, Tensor residual = Tensor());
     Tensor matmul(Tensor &Art, Tensor &Aot, Tensor &Bt, Tensor residual = Tensor());
     Tensor normalize(Tensor& weight, Tensor& bias, size_t heads = 1, float epsilon=1e-5);
-    Tensor operator[](size_t index);
+    
     Tensor wkv5(Tensor& r, Tensor& k, Tensor& v, Tensor& w, Tensor& u);
+
+    Tensor operator[](size_t index);
     Tensor operator[](std::vector<std::vector<size_t>> index);
+    
     void copyfrom(Tensor other){
         if (device == DEVICE::CUDA){
             cudaMemcpy(data, other.data, data_size_in_bytes, cudaMemcpyDeviceToDevice);
@@ -423,7 +464,7 @@ struct Tensor{
         return *this;
     }
 
-    Tensor reshape(std::vector<size_t> shape);
+    inline Tensor reshape(std::vector<size_t> shape);
 };
 
 #include "tensor/operators/ops.h"

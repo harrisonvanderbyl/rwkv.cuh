@@ -6,7 +6,7 @@
 void relusquare_cpu_kernel(void* input, void* output, int size, TENSORTYPE dtype);
 void relusquare_cuda_kernel(void* input, void* output, int size, TENSORTYPE dtype);
 
-Tensor Tensor::relusquared(){
+inline Tensor Tensor::relusquared(){
     Tensor output = Tensor(this->shape, this->dtype, this->device, this->device_id);
     size_t size = this->get_element_count();
 

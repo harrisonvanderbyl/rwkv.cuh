@@ -34,6 +34,7 @@ class Linear
             this->weight = other.weight;
             this->range = other.range;
             this->offset = other.offset;
+            this->quantized = other.quantized;
 
             
         }

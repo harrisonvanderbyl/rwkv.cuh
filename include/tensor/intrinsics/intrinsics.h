@@ -101,12 +101,12 @@ ARMONLY(
 AVXONLY(
     __attribute__ ((target ("avx512f")))
     void simd_sigmoidmul(float* input, float* other, float* residual, float* output){
-        _mm512_storeu_ps(output, _mm512_add_ps(_mm512_div_ps(*(__m512*)other, _mm512_add_ps(_mm512_set1_ps(1.0f), _mm512_exp_ps(-*(__m512*)input))), *(__m512*)residual));
+        _mm512_storeu_ps(output, _mm512_add_ps(_mm512_div_ps(_mm512_loadu_ps(other), _mm512_add_ps(_mm512_set1_ps(1.0f), _mm512_exp_ps(-_mm512_loadu_ps(input)))), _mm512_loadu_ps(residual)));
     }
 
     __attribute__ ((target ("avx2")))
     void simd_sigmoidmul(float* input, float* other, float* residual, float* output){
-        _mm256_storeu_ps(output, _mm256_add_ps(_mm256_div_ps(*(__m256*)other, _mm256_add_ps(_mm256_set1_ps(1.0f), _mm256_exp_ps(-*(__m256*)input))), *(__m256*)residual));
+        _mm256_storeu_ps(output, _mm256_add_ps(_mm256_div_ps(_mm256_loadu_ps(other), _mm256_add_ps(_mm256_set1_ps(1.0f), _mm256_exp_ps(-_mm256_loadu_ps(input)))), _mm256_loadu_ps(residual)));
     }
 
     __attribute__ ((target ("default")))
@@ -340,12 +340,12 @@ ARMONLY(
 AVXONLY(
     __attribute__ ((target ("avx512f")))
     void simd_relusquare(float* input, float* output){
-        _mm512_storeu_ps(output, _mm512_mul_ps(*(__m512*)input, _mm512_max_ps(*(__m512*)input, _mm512_setzero_ps())));
+        _mm512_storeu_ps(output, _mm512_mul_ps(_mm512_loadu_ps(input), _mm512_max_ps(_mm512_loadu_ps(input), _mm512_setzero_ps())));
     }
 
     __attribute__ ((target ("avx2")))
     void simd_relusquare(float* input, float* output){
-        _mm256_storeu_ps(output, _mm256_mul_ps(*(__m256*)input, _mm256_max_ps(*(__m256*)input, _mm256_setzero_ps())));
+        _mm256_storeu_ps(output, _mm256_mul_ps(_mm256_loadu_ps(input), _mm256_max_ps(_mm256_loadu_ps(input), _mm256_setzero_ps())));
     }
 
     __attribute__ ((target ("default")))
@@ -643,11 +643,11 @@ AVXONLY(
         __m256 v3u = _mm256_div_ps(v2u, _mm256_set1_ps(vareps));
         __m256 v3l = _mm256_div_ps(v2l, _mm256_set1_ps(vareps));
 
-        __m256 v4u = bf16_float32_avx2(_mm256_extracti128_si256(*(__m256i*)weight, 0));
-        __m256 v4l = bf16_float32_avx2(_mm256_extracti128_si256(*(__m256i*)weight, 1));
+        __m256 v4u = bf16_float32_avx2(_mm256_extracti128_si256(_mm256_loadu_si256((__m256i_u*)weight), 0));
+        __m256 v4l = bf16_float32_avx2(_mm256_extracti128_si256(_mm256_loadu_si256((__m256i_u*)weight), 1));
 
-        __m256 v5u = _mm256_add_ps(_mm256_mul_ps(v3u, v4u), bf16_float32_avx2(_mm256_extracti128_si256(*(__m256i*)bias, 0)));
-        __m256 v5l = _mm256_add_ps(_mm256_mul_ps(v3l, v4l), bf16_float32_avx2(_mm256_extracti128_si256(*(__m256i*)bias, 1)));
+        __m256 v5u = _mm256_add_ps(_mm256_mul_ps(v3u, v4u), bf16_float32_avx2(_mm256_extracti128_si256(_mm256_loadu_si256((__m256i_u*)bias), 0)));
+        __m256 v5l = _mm256_add_ps(_mm256_mul_ps(v3l, v4l), bf16_float32_avx2(_mm256_extracti128_si256(_mm256_loadu_si256((__m256i_u*)bias), 1)));
 
         _mm256_storeu_si256((__m256i*)output, float32_bf16_avx2(v5l, v5u));
 
@@ -807,7 +807,7 @@ AVXONLY(
     // avx2 bf16 dot product
     
 
-    __attribute__ ((target ("avx2")))
+    __attribute__ ((target ("avx2","fma"),))
     __m256 dotbf16_avx2(__m256 acc, void* a, void* b){
         __m256i v1 = _mm256_loadu_si256((__m256i*)a);
         __m256i v2 = _mm256_loadu_si256((__m256i*)b);
@@ -818,8 +818,8 @@ AVXONLY(
         __m256 v2u = bf16_float32_avx2(_mm256_extracti128_si256(v2, 0));
         __m256 v2l = bf16_float32_avx2(_mm256_extracti128_si256(v2, 1));
 
-        __m256 v3u = fma(v1u, v2u, acc);
-        return fma(v1l, v2l, v3u);
+        __m256 v3u = _mm256_fmadd_ps(v1u, v2u, acc);
+        return _mm256_fmadd_ps(v1l, v2l, v3u);
 
     }
 

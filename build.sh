@@ -9,10 +9,10 @@ export HEADERFILES=$(echo $HEADERFILES | sed 's/ .*//')
 export HEADERFILES="$HEADERFILES -I./include"
 
 # include debug symbols
-export DEBUG="-g -G"
+# export DEBUG="-g -G"
 
+# include release symbols
+export RELEASE="-O3 --use_fast_math --forward-unknown-to-host-compiler -ffast-math"
 
-g++ ./cpuops.cpp -I./include/ -pthread -o ./cpuops.o -c -g 
-
-nvcc ./rwkv.cu ./cpuops.o  -I$HEADERFILES -L$LIBRARYFILES $DEBUG  -o ./rwkv 
-# g++ ./rwkv.cpp ./cpuops.o  -I./include -o ./rwkvcpu -march=native -pthread
+nvcc ./rwkv.cu ./cpuops.cpp  -I$HEADERFILES -L$LIBRARYFILES $DEBUG $RELEASE -o ./rwkv -arch=sm_80 
+# g++ ./rwkv.cu.cpp ./cpuops.cpp  -I./include -o ./rwkvcpu -pthread

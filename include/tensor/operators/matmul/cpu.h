@@ -6,8 +6,8 @@
 #include "tensor/intrinsics/intrinsics.h"
 #include "tensor/operators/matmul/threading.h"
 
-AVXONLY(
-    __attribute__((target("avx2"))) 
+
+    __attribute__((target("avx2","fma","avx512f"))) 
     void dopartial(MatMulJob job)
     {
         // do the work
@@ -30,12 +30,11 @@ AVXONLY(
                     const float *Ario1 = (((float *)Ar) + dii + b);
                     const float *Aoio1 = (((float *)Ao) + dii + b);
 
-                    float zz1[8] = {0.0};
+                    auto zz1 = _mm256_loadu_ps(flp(C) + bbt * OUTSHAPE + dii + b);
 
                     for (uint32_t i = dii + b; i < dii + b + 8; i += 1)
                     {
-                        auto Aoio = _mm256_set1_ps(Aoio1[i & 7]);
-                        auto Ario = _mm256_set1_ps(Ario1[i & 7]);
+                        auto Aoio = Aoio1[i & 7]/Ario1[i & 7];
 
                         const auto IAINSHAPE = A + i * INSHAPE;
 
@@ -46,26 +45,26 @@ AVXONLY(
                             // avx2
                             auto w = _mm256_cvtepu8_epi32(_mm_loadu_si128((__m128i *)(IAINSHAPE + k))); // Load the input uint8_t vector
                             // convert uint32_t to float32x8_t
-                            auto u = fma(_mm256_cvtepi32_ps(w), Ario, Aoio); // Convert uint32_t to float32_t
+                            auto u = _mm256_cvtepi32_ps(w) + Aoio; // Convert uint32_t to float32_t
                             // Load the input float vector
                             // Perform the multiplication with inp vector
-                            sum1 = fma(u, _mm256_loadu_ps(((float *)B) + bbt * INSHAPE + k), sum1);
+                            sum1 = _mm256_fmadd_ps(u, _mm256_loadu_ps(((float *)B) + bbt * INSHAPE + k), sum1);
 
                             auto w1 = _mm256_cvtepu8_epi32(_mm_loadu_si128((__m128i *)(IAINSHAPE + k + 8))); // Load the input uint8_t vector
 
-                            auto u1 = fma(_mm256_cvtepi32_ps(w1), Ario, Aoio); // Convert uint32_t to float32_t
+                            auto u1 = _mm256_cvtepi32_ps(w1) + Aoio; // Convert uint32_t to float32_t
 
-                            sum2 = fma(u1, _mm256_loadu_ps(((float *)B) + bbt * INSHAPE + k + 8), sum2);
+                            sum2 = _mm256_fmadd_ps(u1, _mm256_loadu_ps(((float *)B) + bbt * INSHAPE + k + 8), sum2);
                         }
 
                         sum1 = _mm256_add_ps(sum1, sum2);
 
-                        zz1[i & 7] = sum1[0] + sum1[1] + sum1[2] + sum1[3] + sum1[4] + sum1[5] + sum1[6] + sum1[7];
+                        zz1[i & 7] += (sum1[0] + sum1[1] + sum1[2] + sum1[3] + sum1[4] + sum1[5] + sum1[6] + sum1[7])*Ario1[i & 7];
                     }
 
                     _mm256_storeu_ps(
                         flp(C) + bbt * OUTSHAPE + dii + b,
-                        _mm256_loadu_ps(zz1));
+                        zz1);
                 }
             }
         }
@@ -74,7 +73,7 @@ AVXONLY(
 
 
 
-__attribute__((target("avx2")))
+__attribute__((target("avx2","fma")))
 void dopartialfp(MatMulJob job)
 {
     // do the work
@@ -95,7 +94,7 @@ void dopartialfp(MatMulJob job)
             {
                 for (size_t b = 0; b < 16; b += 8)
                 {
-                    float zz1[8] = {0.0};
+                    auto zz1 = _mm256_loadu_ps(flp(C) + bbt * OUTSHAPE + dii + b);
 
                     for (uint32_t i = dii + b; i < dii + b + 8; i += 1)
                     {
@@ -105,18 +104,18 @@ void dopartialfp(MatMulJob job)
                         auto sum2 = _mm256_set1_ps(0.0);
                         for (uint32_t k = 0; k < INSHAPE; k += 16)
                         {
-                            sum1 = fma(_mm256_loadu_ps(IAINSHAPE + k), _mm256_loadu_ps(flp(B) + bbt * INSHAPE + k), sum1);
-                            sum2 = fma(_mm256_loadu_ps(IAINSHAPE + k + 8), _mm256_loadu_ps(flp(B) + bbt * INSHAPE + k + 8), sum2);
+                            sum1 = _mm256_fmadd_ps(_mm256_loadu_ps(IAINSHAPE + k), _mm256_loadu_ps(flp(B) + bbt * INSHAPE + k), sum1);
+                            sum2 = _mm256_fmadd_ps(_mm256_loadu_ps(IAINSHAPE + k + 8), _mm256_loadu_ps(flp(B) + bbt * INSHAPE + k + 8), sum2);
                         }
 
                         sum1 = _mm256_add_ps(sum1, sum2);
 
-                        zz1[i & 7] = sum1[0] + sum1[1] + sum1[2] + sum1[3] + sum1[4] + sum1[5] + sum1[6] + sum1[7];
+                        zz1[i & 7] += sum1[0] + sum1[1] + sum1[2] + sum1[3] + sum1[4] + sum1[5] + sum1[6] + sum1[7];
                     }
 
                     _mm256_storeu_ps(
                         flp(C) + bbt * OUTSHAPE + dii + b,
-                        _mm256_loadu_ps(zz1));
+                        zz1);
                 }
             }
         }
@@ -127,6 +126,19 @@ void dopartialfp(MatMulJob job)
             {
                 
                     float zz1[16] = {0.0};
+                    _mm256_storeu_ps(
+                        &zz1[0],
+                        bf16_float32_avx2(
+                            _mm_loadu_si128((__m128i_u*)(bflp(C) + bbt * OUTSHAPE + dii))
+                        )
+                        );
+                    _mm256_storeu_ps(
+                        &zz1[8],
+                        bf16_float32_avx2(
+                            _mm_loadu_si128((__m128i_u*)(bflp(C) + bbt * OUTSHAPE + dii + 8))
+                        )
+                    );
+
 
                     for (uint32_t i = dii; i < dii + 16; i += 1)
                     {
@@ -138,11 +150,11 @@ void dopartialfp(MatMulJob job)
                             sum1 = dotbf16_avx2(sum1, (void*)(IAINSHAPE + k), bflp(B) + bbt * INSHAPE + k);
                         }
 
-                        zz1[i & 15] = sum1[0] + sum1[1] + sum1[2] + sum1[3] + sum1[4] + sum1[5] + sum1[6] + sum1[7];
+                        zz1[i & 15] += sum1[0] + sum1[1] + sum1[2] + sum1[3] + sum1[4] + sum1[5] + sum1[6] + sum1[7];
                     }
 
-                    __m256 values = _mm256_loadu_ps(zz1);
-                    __m256 values2 = _mm256_loadu_ps(zz1 + 8);
+                    __m256 values = _mm256_loadu_ps(&zz1[0]);
+                    __m256 values2 = _mm256_loadu_ps(&zz1[8]);
 
                     auto values3 = float32_bf16_avx2(values2, values);
 
@@ -162,7 +174,7 @@ void dopartialfp(MatMulJob job)
 printf("dopartialfp not implemented for this architecture");
 }
 
-)
+
 
 
 ARMONLY(
@@ -198,6 +210,7 @@ ARMONLY(
 
                         auto sum1 = SET1(0.0);
                         auto sum2 = SET1(0.0);
+                        // remember to change this to load from residual
 
                         for (uint32_t k = 0; k < INSHAPE; k += 8)
                         {
@@ -346,7 +359,7 @@ void dopartialwkv5att(MatMulJob job)
     // 2d
     uint32_t hhsize = CH * CH;
 
-    size_t simdwidth = get_simd_width();
+    // size_t simdwidth = get_simd_width();
 
     for (uint32_t t = 0; t < T; t++)
     {
@@ -391,17 +404,13 @@ void dopartialwkv5att(MatMulJob job)
 
                 // atu = k[t,bb,hh,i]*v[t,bb,hh,j]
                 float vvv;
-                float outtt;
-
                 if (dtype == TENSORTYPE::kFLOAT_32)
                 {
                     vvv = flp(vv)[jind];
-                    outtt = flp(out)[jind];
                 }
                 if (dtype == TENSORTYPE::kBFLOAT_16)
                 {
                     vvv = float(bflp(vv)[jind]);
-                    outtt = float(bflp(out)[jind]);
                 }
 
                 float sss = flp(ss)[sind];
@@ -412,19 +421,19 @@ void dopartialwkv5att(MatMulJob job)
                 // out[t,bb,hh,j] += r[t,bb,hh,i]*(s[bb,hh,i,j] + atu*u[hh,i] )
                 auto sssatuuuu = atu * uuu + sss;
 
-                float outf = sssatuuuu * rrr + outtt;
+                float outf = sssatuuuu * rrr;
 
                 // s[bb,hh,i,j] = s[bb,hh,i,j] * w[hh,i] + atu
                 if (dtype == TENSORTYPE::kBFLOAT_16)
                 {
-                    bflp(out)[jind] = bfloat16(outf);
+                    *(bflp(out) + jind) = float32_to_bfloat16(outf + bfloat16_to_float32(*(bflp(out) + jind)));
                 }
                 if (dtype == TENSORTYPE::kFLOAT_32)
                 {
-                    flp(out)[jind] = outf;
+                    flp(out)[jind] += outf;
                 }
 
-                flp(ss)[sind] = sss * www + atu;
+                *(flp(ss) + sind) = sss * www + atu;
             }
         }
     }

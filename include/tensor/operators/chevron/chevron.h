@@ -35,14 +35,14 @@ static std::ostream& operator<<(std::ostream& os, const Tensor& t) {
     if (t.dtype == TENSORTYPE::kBFLOAT_16){
         os << "\n";
         os << "[";
-        os << float(t.get<bfloat16>(0)) << ", ";
+        os << (t.get<bfloat16>(0)) << ", ";
         if(t.get_element_count() > 1)
-            os << float(t.get<bfloat16>(1)) << ", ";
+            os << (t.get<bfloat16>(1)) << ", ";
         if(t.get_element_count() > 2)
             os << "...";
         if(t.get_element_count() > 3){
-            os << ", " << float(t.get<bfloat16>(t.get_element_count() - 2));
-            os << ", " << float(t.get<bfloat16>(t.get_element_count() - 1));
+            os << ", " << (t.get<bfloat16>(t.get_element_count() - 2));
+            os << ", " << (t.get<bfloat16>(t.get_element_count() - 1));
         }
         
 

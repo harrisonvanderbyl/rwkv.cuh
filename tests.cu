@@ -4,9 +4,18 @@
 
 int main(){
     
-    Tensor bias = {{8}, std::vector<float>{1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0}};
-    Tensor weight = {{8}, std::vector<float>{1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0}};
-    Tensor input = {{2,8}, std::vector<float>{1.0, 0.5, 0.3, 0.2, 0.1, 0.05, 0.03, 0.02, 0.01, 0.005, 0.003, 0.002, 0.001, 0.0005, 0.0003, 0.0002}};
+    Tensor bias = {{256}};
+    for (int i = 0; i < 256; i++){
+        ((float*)bias.data)[i] = float(rand())/float(RAND_MAX);
+    }
+    Tensor weight = {{256}};
+    for (int i = 0; i < 256; i++){
+        ((float*)weight.data)[i] = float(rand())/float(RAND_MAX);
+    }
+    Tensor input = {{2,256}};
+    for (int i = 0; i < 2*256; i++){
+        ((float*)input.data)[i] = float(rand())/float(RAND_MAX);
+    }
 
     auto output = input.normalize(weight,bias);
 
@@ -17,9 +26,18 @@ int main(){
 
     std::cout << "Normalize tests bf16" << std::endl;
 
-    Tensor bias_bf16 = {{8}, std::vector<bfloat16>{1.0, 2.0, 3.0, 4.0, 5.0, 6.0,7.0,8.0}};
-    Tensor weight_bf16 = {{8}, std::vector<bfloat16>{1.0, 2.0, 3.0, 4.0, 5.0, 6.0,7.0,8.0}};
-    Tensor input_bf16 = {{2,8}, std::vector<bfloat16>{1.0, 0.5, 0.3, 0.2, 0.1, 0.05, 0.03, 0.02, 0.01, 0.005, 0.003, 0.002, 0.001, 0.0005, 0.0003, 0.0002}};
+    Tensor bias_bf16 = {{256}, TENSORTYPE::kBFLOAT_16};
+    for (int i = 0; i < 256; i++){
+        ((bfloat16*)bias_bf16.data)[i] = bfloat16(((float*)bias.data)[i]);
+    }
+    Tensor weight_bf16 = {{256}, TENSORTYPE::kBFLOAT_16};
+    for (int i = 0; i < 256; i++){
+        ((bfloat16*)weight_bf16.data)[i] = bfloat16(((float*)weight.data)[i]);
+    }
+    Tensor input_bf16 = {{2,256}, TENSORTYPE::kBFLOAT_16};
+    for (int i = 0; i < 2*256; i++){
+        ((bfloat16*)input_bf16.data)[i] = bfloat16(((float*)input.data)[i]);
+    }
 
     auto output_bf16 = input_bf16.normalize(weight_bf16,bias_bf16);
 
@@ -28,13 +46,9 @@ int main(){
 
     std::cout << "Normalize tests float cuda" << std::endl;
 
-    Tensor bias_cuda = {{8}, std::vector<float>{1.0, 2.0, 3.0, 4.0, 5.0, 6.0,7.0,8.0}};
-    Tensor weight_cuda = {{8}, std::vector<float>{1.0, 2.0, 3.0, 4.0, 5.0, 6.0,7.0,8.0}};
-    Tensor input_cuda = {{2,8}, std::vector<float>{1.0, 0.5, 0.3, 0.2, 0.1, 0.05, 0.03, 0.02, 0.01, 0.005, 0.003, 0.002, 0.001, 0.0005, 0.0003, 0.0002}};
-
-    bias_cuda = bias_cuda.cuda();
-    weight_cuda = weight_cuda.cuda();
-    input_cuda = input_cuda.cuda();
+    Tensor bias_cuda = bias.cuda();
+    Tensor weight_cuda = weight.cuda();
+    Tensor input_cuda = input.cuda();
 
     auto output_cuda = input_cuda.normalize(weight_cuda,bias_cuda);
 
@@ -43,12 +57,10 @@ int main(){
 
     std::cout << "Normalize tests bf16 cuda" << std::endl;
 
-    Tensor bias_bf16_cuda = {{8}, std::vector<bfloat16>{1.0, 2.0, 3.0, 4.0, 5.0, 6.0,7.0,8.0}};
-    Tensor weight_bf16_cuda = {{8}, std::vector<bfloat16>{1.0, 2.0, 3.0, 4.0, 5.0, 6.0,7.0,8.0}};
-    Tensor input_bf16_cuda = {{2,8}, std::vector<bfloat16>{1.0, 0.5, 0.3, 0.2, 0.1, 0.05, 0.03, 0.02, 0.01, 0.005, 0.003, 0.002, 0.001, 0.0005, 0.0003, 0.0002}};
-    bias_bf16_cuda = bias_bf16_cuda.cuda();
-    weight_bf16_cuda = weight_bf16_cuda.cuda();
-    input_bf16_cuda = input_bf16_cuda.cuda();
+    Tensor bias_bf16_cuda = bias_bf16.cuda();
+    Tensor weight_bf16_cuda = weight_bf16.cuda();
+    Tensor input_bf16_cuda = input_bf16.cuda();
+ 
 
     auto output_bf16_cuda = input_bf16_cuda.normalize(weight_bf16_cuda,bias_bf16_cuda);
 
@@ -79,18 +91,28 @@ int main(){
 
     
    // relusquare test
-   Tensor rtest = {{8}, std::vector<float>{1.0, -0.5, 2.0, -0.2, -0.1, -0.05, -0.03, -0.02}};
+    std::cout << "Relusquared tests start" << std::endl;
+   Tensor rtest = {{256}};
+    for (int i = 0; i < 256; i++){
+        ((float*)rtest.data)[i] = float(rand())/float(RAND_MAX) - 0.5;
+    }
    // bfloat16 test
-    Tensor rtest_bf16 = {{8}, std::vector<bfloat16>{1.0, -0.5, 2.0, -0.2, -0.1, -0.05, -0.03, -0.02}};
+    Tensor rtest_bf16 = {{256}, TENSORTYPE::kBFLOAT_16};
+
+    for (int i = 0; i < 256; i++){
+        ((bfloat16*)rtest_bf16.data)[i] = bfloat16(((float*)rtest.data)[i]);
+    }
     // cuda float test
-    Tensor rtest_cuda = {{8}, std::vector<float>{1.0, -0.5, 2.0, -0.2, -0.1, -0.05, -0.03, -0.02}};
-    rtest_cuda = rtest_cuda.cuda();
+    Tensor rtest_cuda = rtest.cuda();
     // cuda bfloat16 test
-    Tensor rtest_bf16_cuda = {{8}, std::vector<bfloat16>{1.0, -0.5, 2.0, -0.2, -0.1, -0.05, -0.03, -0.02}};
-    rtest_bf16_cuda = rtest_bf16_cuda.cuda();
+    Tensor rtest_bf16_cuda = rtest_bf16.cuda();
+
+    std::cout << "Relusquared tests starting" << std::endl;
 
     auto rtest_out = rtest.relusquared();
     auto rtest_out_bf16 = rtest_bf16.relusquared();
+
+    std::cout << "Relusquared tests starting cuda" << std::endl;
 
     auto rtest_out_cuda = rtest_cuda.relusquared();
     auto rtest_out_bf16_cuda = rtest_bf16_cuda.relusquared();
@@ -106,24 +128,36 @@ int main(){
     std::cout << rtest_out_cuda.get<float>(0) << "," << rtest_out_cuda.get<float>(1) << "," << rtest_out_cuda.get<float>(2) << "," << rtest_out_cuda.get<float>(3) << std::endl;
     std::cout << (float)rtest_out_bf16_cuda.get<bfloat16>(0) << "," << (float)rtest_out_bf16_cuda.get<bfloat16>(1) << "," << (float)rtest_out_bf16_cuda.get<bfloat16>(2) << "," << (float)rtest_out_bf16_cuda.get<bfloat16>(3) << std::endl;
 
+    std::cout << "Relusquared tests end" << std::endl;
+
+    // sigmoid test
+    std::cout << "Sigmoid tests start" << std::endl;
     // sigmoidmul test
-    Tensor stest = {{8}, std::vector<float>{1.0, -0.5, 2.0, -0.2, -0.1, -0.05, -0.03, -0.02}};
-    Tensor stest2 = {{8}, std::vector<float>{0.8, 9.5, 0.2, 0.2, 0.1, 0.05, 0.03, 0.02}};
+    Tensor stest = rtest;
+    Tensor stest2 = rtest;
+    Tensor stest3 = rtest;
     // bfloat16 test
-    Tensor stest_bf16 = {{8}, std::vector<bfloat16>{1.0, -0.5, 2.0, -0.2, -0.1, -0.05, -0.03, -0.02}};
-    Tensor stest2_bf16 = {{8}, std::vector<bfloat16>{0.8, 9.5, 0.2, 0.2, 0.1, 0.05, 0.03, 0.02}};
+    Tensor stest_bf16 = rtest_bf16;
+    Tensor stest2_bf16 = rtest_bf16;
+    Tensor stest3_bf16 = rtest_bf16;
     // cuda float test
     Tensor stest_cuda = stest.cuda();
     Tensor stest2_cuda = stest2.cuda();
+    Tensor stest3_cuda = stest3.cuda();
     // cuda bfloat16 test
     Tensor stest_bf16_cuda = stest_bf16.cuda();
     Tensor stest2_bf16_cuda = stest2_bf16.cuda();
+    Tensor stest3_bf16_cuda = stest3_bf16.cuda();
 
-    auto stest_out = stest.sigmoidmul(stest2);
-    auto stest_out_bf16 = stest_bf16.sigmoidmul(stest2_bf16);
+    std::cout << "Sigmoid tests starting" << std::endl;
 
-    auto stest_out_cuda = stest_cuda.sigmoidmul(stest2_cuda);
-    auto stest_out_bf16_cuda = stest_bf16_cuda.sigmoidmul(stest2_bf16_cuda);
+    auto stest_out = stest.sigmoidmul(stest2, stest3);
+    auto stest_out_bf16 = stest_bf16.sigmoidmul(stest2_bf16, stest3_bf16);
+
+    std::cout << "Sigmoid tests starting cuda" << std::endl;
+
+    auto stest_out_cuda = stest_cuda.sigmoidmul(stest2_cuda, stest3_cuda);
+    auto stest_out_bf16_cuda = stest_bf16_cuda.sigmoidmul(stest2_bf16_cuda, stest3_bf16_cuda);
 
     std::cout << "Sigmoidmul tests" << std::endl;
     std::cout << stest_out << std::endl;
@@ -131,20 +165,34 @@ int main(){
     std::cout << stest_out_cuda << std::endl;
     std::cout << stest_out_bf16_cuda << std::endl;
 
-    std::cout << stest_out.get<float>(0) << "," << stest_out.get<float>(1) << "," << stest_out.get<float>(2) << "," << stest_out.get<float>(3) << std::endl;
-    std::cout << (float)stest_out_bf16.get<bfloat16>(0) << "," << (float)stest_out_bf16.get<bfloat16>(1) << "," << (float)stest_out_bf16.get<bfloat16>(2) << "," << (float)stest_out_bf16.get<bfloat16>(3) << std::endl;
-    std::cout << stest_out_cuda.get<float>(0) << "," << stest_out_cuda.get<float>(1) << "," << stest_out_cuda.get<float>(2) << "," << stest_out_cuda.get<float>(3) << std::endl;
-    std::cout << (float)stest_out_bf16_cuda.get<bfloat16>(0) << "," << (float)stest_out_bf16_cuda.get<bfloat16>(1) << "," << (float)stest_out_bf16_cuda.get<bfloat16>(2) << "," << (float)stest_out_bf16_cuda.get<bfloat16>(3) << std::endl;
-
     // lerp test
-    Tensor ltest = {{8}, std::vector<float>{1.0, -0.5, 2.0, -0.2, -0.1, -0.05, -0.03, -0.02}};
-    Tensor ltest2 = {{8}, std::vector<float>{0.8, 9.5, 0.2, 0.2, 0.1, 0.05, 0.03, 0.02}};
-    Tensor lweight = {{2}, std::vector<float>{0.5, 2.0}};
+    Tensor ltest = {{256}};
+    for (int i = 0; i < 256; i++){
+        ((float*)ltest.data)[i] = float(rand())/float(RAND_MAX);
+    }
+    Tensor ltest2 = {{256}};
+    for (int i = 0; i < 256; i++){
+        ((float*)ltest2.data)[i] = float(rand())/float(RAND_MAX);
+    }
+    Tensor lweight = {{128}};
+    for (int i = 0; i < 128; i++){
+        ((float*)lweight.data)[i] = float(rand())/float(RAND_MAX);
+    }
 
     // bfloat16 test
-    Tensor ltest_bf16 = {{8}, std::vector<bfloat16>{1.0, -0.5, 2.0, -0.2, -0.1, -0.05, -0.03, -0.02}};
-    Tensor ltest2_bf16 = {{8}, std::vector<bfloat16>{0.8, 9.5, 0.2, 0.2, 0.1, 0.05, 0.03, 0.02}};
-    Tensor lweight_bf16 = {{2}, std::vector<bfloat16>{0.5, 2.0}};
+    Tensor ltest_bf16 = {{256}, TENSORTYPE::kBFLOAT_16};
+
+    for (int i = 0; i < 256; i++){
+        ((bfloat16*)ltest_bf16.data)[i] = bfloat16(((float*)ltest.data)[i]);
+    }
+    Tensor ltest2_bf16 = {{256}, TENSORTYPE::kBFLOAT_16};
+    for (int i = 0; i < 256; i++){
+        ((bfloat16*)ltest2_bf16.data)[i] = bfloat16(((float*)ltest2.data)[i]);
+    }
+    Tensor lweight_bf16 = {{128}, TENSORTYPE::kBFLOAT_16};
+    for (int i = 0; i < 128; i++){
+        ((bfloat16*)lweight_bf16.data)[i] = bfloat16(((float*)lweight.data)[i]);
+    }
 
     // cuda float test
     Tensor ltest_cuda = ltest.cuda();
@@ -174,13 +222,22 @@ int main(){
     std::cout << (float)ltest_out_bf16_cuda.get<bfloat16>(0) << "," << (float)ltest_out_bf16_cuda.get<bfloat16>(1) << "," << (float)ltest_out_bf16_cuda.get<bfloat16>(2) << "," << (float)ltest_out_bf16_cuda.get<bfloat16>(3) << std::endl;
     
     // swishmul test
-    Tensor wtest = {{8}, std::vector<float>{1.0, -0.5, 2.0, -0.2, -0.1, -0.05, -0.03, -0.02}};
-    Tensor wtest2 = {{8}, std::vector<float>{0.8, 9.5, 0.2, 0.2, 0.1, 0.05, 0.03, 0.02}};
+    Tensor wtest = {{256}};
+    for (int i = 0; i < 256; i++){
+        ((float*)wtest.data)[i] = float(rand())/float(RAND_MAX);
+    }
+    Tensor wtest2 = {{256}};
+    for (int i = 0; i < 256; i++){
+        ((float*)wtest2.data)[i] = float(rand())/float(RAND_MAX);
+    }
 
     // bfloat16 test
-    Tensor wtest_bf16 = {{8}, std::vector<bfloat16>{1.0, -0.5, 2.0, -0.2, -0.1, -0.05, -0.03, -0.02}};
-    Tensor wtest2_bf16 = {{8}, std::vector<bfloat16>{0.8, 9.5, 0.2, 0.2, 0.1, 0.05, 0.03, 0.02}};
-
+    Tensor wtest_bf16 = {{256}, TENSORTYPE::kBFLOAT_16};
+    Tensor wtest2_bf16 = {{256}, TENSORTYPE::kBFLOAT_16};
+    for (int i = 0; i < 256; i++){
+        ((bfloat16*)wtest_bf16.data)[i] = bfloat16(((float*)wtest.data)[i]);
+        ((bfloat16*)wtest2_bf16.data)[i] = bfloat16(((float*)wtest2.data)[i]);
+    }
     // cuda float test
     Tensor wtest_cuda = wtest.cuda();
     Tensor wtest2_cuda = wtest2.cuda();
@@ -275,9 +332,7 @@ int main(){
 
     std::cout << "wkvtest bf16" << std::endl;
     std::cout << out_bf16 << std::endl;
-    std::cout << (float)out_bf16.get<bfloat16>(0) << ","<< (float)out_bf16.get<bfloat16>(1) <<","<< (float)out_bf16.get<bfloat16>(2) << ","<<(float)out_bf16.get<bfloat16>(3) << std::endl;
-    std::cout << (float)wkvtest_bf16.get<float>(0) << ","<< (float)wkvtest_bf16.get<float>(1) <<","<< (float)wkvtest_bf16.get<float>(2) << ","<<(float)wkvtest_bf16.get<float>(3) << std::endl;
-
+    std::cout << wkvtest_bf16 << std::endl;
     // wkvtest cuda bf16
     auto kbf16_cuda = kbf16.cuda();
     auto vbf16_cuda = vbf16.cuda();
@@ -289,9 +344,8 @@ int main(){
 
     std::cout << "wkvtest cuda bf16" << std::endl;
     std::cout << out_bf16_cuda << std::endl;
-    std::cout << (float)out_bf16_cuda.get<bfloat16>(0) << ","<< (float)out_bf16_cuda.get<bfloat16>(1) <<","<< (float)out_bf16_cuda.get<bfloat16>(2) << ","<<(float)out_bf16_cuda.get<bfloat16>(3) << std::endl;
-    std::cout << (float)wkvtest_bf16_cuda.get<float>(0) << ","<< (float)wkvtest_bf16_cuda.get<float>(1) <<","<< (float)wkvtest_bf16_cuda.get<float>(2) << ","<<(float)wkvtest_bf16_cuda.get<float>(3) << std::endl;
-
+    std::cout << wkvtest_bf16_cuda << std::endl;
+    exit(0);
     // matmultest 
     std::cout << "matmultest" << std::endl;
     Tensor matmultest = {{256,256}};
@@ -343,12 +397,30 @@ int main(){
     std::cout << outputmm_cuda << std::endl;
     std::cout << outputmm_bf16_cuda << std::endl;
     std::cout << outputmm_cuda.get<float>(0) << ","<< outputmm_cuda.get<float>(1) <<","<< outputmm_cuda.get<float>(2) << ","<<outputmm_cuda.get<float>(3) << std::endl;
-    std::cout << (float)outputmm_bf16_cuda.get<bfloat16>(0) << ","<< (float)outputmm_bf16_cuda.get<bfloat16>(1) <<","<< (float)outputmm_bf16_cuda.get<bfloat16>(2) << ","<<(float)outputmm_bf16_cuda.get<bfloat16>(3) << std::endl;
+    std::cout << outputmm_bf16_cuda.get<bfloat16>(0) << ","<< outputmm_bf16_cuda.get<bfloat16>(1) <<","<< outputmm_bf16_cuda.get<bfloat16>(2) << ","<<outputmm_bf16_cuda.get<bfloat16>(3) << std::endl;
 
     // matmultest cuda
 
+    // Tensor a = {{65536,204256},TENSORTYPE::kBFLOAT_16};
+    // for(size_t i = 0; i < 204256*65536; i++){
+    //     ((bfloat16*)a.data)[i] = bfloat16(0.25*float(rand())/float(RAND_MAX));
+    // }
 
+    // Tensor b = {{1,10,204256},TENSORTYPE::kBFLOAT_16};
+    // for(size_t i = 0; i < 10*204256; i++){
+    //     ((bfloat16*)b.data)[i] =  bfloat16(0.25*float(rand())/float(RAND_MAX));;
+    // }
 
+    // auto outcpu = a.matmul(b);
+
+    // std::cout << outcpu;
+
+    // auto acuda = a.cuda();
+    // auto bcuda = b.cuda();
+
+    // auto outcuda = acuda.matmul(bcuda);
+
+    // std::cout << outcuda.cpu();
 
     return 0;
 }

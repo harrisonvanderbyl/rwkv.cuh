@@ -16,7 +16,16 @@ class LayerNorm
             this->eps = eps;
 
         }
+
         LayerNorm(){
+        }
+
+        // copy constructor
+        LayerNorm(const LayerNorm& other){
+            this->weight = other.weight;
+            this->bias = other.bias;
+            this->heads = other.heads;
+            this->eps = other.eps;
         }
 
         Tensor operator()(Tensor& input){

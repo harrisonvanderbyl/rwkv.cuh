@@ -65,7 +65,7 @@ class RWKV_5_ATT
             
             
             auto xx = this->timeshift(input);
-
+            
             
             
             auto kr = this->time_mix_k.lerp(xx, input);
@@ -76,13 +76,17 @@ class RWKV_5_ATT
             auto r = this->receptance(rr);
             auto gr = this->time_mix_g.lerp(xx, input);
             auto gv = this->gate(gr);
+
     
             auto xm = this->state.wkv5(r,k,v,this->time_decay,this->time_faaaa);
 
-            
+
+       
             auto xxa = this->ln_x(xm);
 
+
             auto gvo = gv.swishmul(xxa);
+
                
             return this->output(gvo, residual);
         }

@@ -7,7 +7,11 @@ template <typename T>
 __global__ void relusquare_kernel(T *a, T *b, int size) {
     int idx = blockIdx.x * blockDim.x + threadIdx.x;
     if (idx < size) {
-        b[idx] = T(float(a[idx]) > 0 ? float(a[idx]) * float(a[idx]) : 0);
+        if (float(a[idx]) > 0) {
+            b[idx] = a[idx] * a[idx];
+        } else {
+            b[idx] = 0;
+        }
     }
 }
 

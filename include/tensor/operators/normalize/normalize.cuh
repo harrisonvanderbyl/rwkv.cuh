@@ -37,11 +37,15 @@ void normalize_cuda_kernel(void* input, void* weight, void* bias, void* output, 
         // one thread per element
         size_t blocks = headshape;
 
+        dim3 dimBlock(threads);
+
+        dim3 dimGrid(blocks);
+
        
         if (dtype == TENSORTYPE::kFLOAT_32)
-            layernorm<<<blocks, threads>>>((float*)input, (float*)output, (float*)weight, (float*)bias, size, lastshape, headshape, eps);
+            layernorm<<<dimGrid, dimBlock>>>((float*)input, (float*)output, (float*)weight, (float*)bias, size, lastshape, headshape, eps);
         else if (dtype == TENSORTYPE::kBFLOAT_16)
-            layernorm<<<blocks, threads>>>((bfloat16*)input, (bfloat16*)output, (bfloat16*)weight, (bfloat16*)bias, size, lastshape, headshape, eps);
+            layernorm<<<dimGrid, dimBlock>>>((bfloat16*)input, (bfloat16*)output, (bfloat16*)weight, (bfloat16*)bias, size, lastshape, headshape, eps);
         else
             throw std::runtime_error("Unsupported datatype for normalize, only float32 and bfloat16 are supported on CUDA");
         

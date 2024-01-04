@@ -3,7 +3,7 @@
 
 #include "tensor/tensor.h"
 
-Tensor Tensor::reshape(std::vector<size_t> inshape) {
+inline Tensor Tensor::reshape(std::vector<size_t> inshape) {
     Tensor ret = *this;
     ret.shape = shape;
     ret.data_size_in_bytes = get_dtype_bytes(dtype);

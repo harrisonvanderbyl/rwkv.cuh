@@ -9,9 +9,4 @@ export HEADERFILES=$(echo $HEADERFILES | sed 's/ .*//')
 export HEADERFILES="$HEADERFILES -I./include"
 
 # include debug symbols
-
-# nvcc ./tests.cu -I$HEADERFILES -L$LIBRARYFILES $DEBUG  -o ./tests 
-g++ ./cpuops.cpp -I./include/ -pthread -o ./cpuops.o -c -g 
-# with avx2
-nvcc ./tests.cu ./cpuops.o -I$HEADERFILES -L$LIBRARYFILES -o ./testsgpu  -g
-g++ ./tests.cpp ./cpuops.o -I./include/ -march=native -pthread -o ./testscpu  -g
+nvcc ./tests.cu ./cpuops.cpp -I$HEADERFILES -L$LIBRARYFILES -o ./testsgpu -arch=sm_80 -g

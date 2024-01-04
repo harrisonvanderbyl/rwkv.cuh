@@ -13,17 +13,7 @@ void wkv5_cpu_kernel(void* kk, void* vv, void* ww, void* uu, void* rr, void* ss,
 void wkv5_cuda_kernel(void* kk, void* vv, void* ww, void* uu, void* rr, void* ss, void* out, size_t T, size_t B, size_t C, size_t H, TENSORTYPE dtype);
 
 
-#ifndef __CUDACC__ 
-void matmul_cuda_kernal(void* A, void* B, void* C, size_t BBT, size_t INSHAPE, size_t OUTSHAPE,TENSORTYPE dtype){
-    throw std::runtime_error("Not compiled with cuda");
-}
-
-void wkv5_cuda_kernel(void* kk, void* vv, void* ww, void* uu, void* rr, void* ss, void* out, size_t T, size_t B, size_t C, size_t H, TENSORTYPE dtype){
-    throw std::runtime_error("Not compiled with cuda");
-}
-#endif
-
-Tensor Tensor::matmul(Tensor &Art, Tensor &Aot,
+inline Tensor Tensor::matmul(Tensor &Art, Tensor &Aot,
                       Tensor &Bt, Tensor Ct)
 {
     // Pointers to the data
@@ -60,7 +50,7 @@ Tensor Tensor::matmul(Tensor &Art, Tensor &Aot,
     return Ct;
 }
 
-Tensor Tensor::matmul(Tensor &Bt, Tensor Ct)
+inline Tensor Tensor::matmul(Tensor &Bt, Tensor Ct)
 {
     // Pointers to the data
     if (Bt.dtype != TENSORTYPE::kFLOAT_32 && Bt.dtype != TENSORTYPE::kBFLOAT_16)
@@ -92,7 +82,7 @@ Tensor Tensor::matmul(Tensor &Bt, Tensor Ct)
     return Ct;
 }
 
-Tensor Tensor::wkv5(Tensor &r, Tensor &k, Tensor &v, Tensor &w, Tensor &u)
+inline Tensor Tensor::wkv5(Tensor &r, Tensor &k, Tensor &v, Tensor &w, Tensor &u)
 {
 
     Tensor y = Tensor({r.shape[0], r.shape[1], r.shape[2]}, r.dtype, r.device, r.device_id);
@@ -112,7 +102,7 @@ Tensor Tensor::wkv5(Tensor &r, Tensor &k, Tensor &v, Tensor &w, Tensor &u)
 
     if (device == DEVICE::CPU)
     {
-       wkv5_cpu_kernel(kk, vv, ww, uu, rr, ss, out, T, B, C, H, dtype);
+        wkv5_cpu_kernel(kk, vv, ww, uu, rr, ss, out, T, B, C, H, dtype);
     }
     else
     {

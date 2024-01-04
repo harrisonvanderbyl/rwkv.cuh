@@ -10,20 +10,12 @@ int main( int argc, char** argv ){
     std::cout << "Hello World" << std::endl;
     std::string path = "./model.safetensors";
 
-    if (argc > 1)
-    {
-        path = argv[1];
-    }
-
+    
     RWKVTokenizer worldTokenizer("rwkv_vocab_v20230424.txt");
     
     auto tokens = worldTokenizer.encode("\n\nUser: please create a long harry potter fanfiction. \n\nAssistant:");
 
-    if (argc > 2)
-    {
-        std::string input = argv[2];
-        tokens = worldTokenizer.encode(input);
-    }
+    
     
     std::cout << worldTokenizer.decode(tokens) << std::endl;
     std::cout << "Loading model" << std::endl;
@@ -33,6 +25,11 @@ int main( int argc, char** argv ){
 
     RWKV model(path);
 
+    if (argc > 1)
+    {
+        model.cuda();
+       
+    }
 
     
 
@@ -71,11 +68,8 @@ int main( int argc, char** argv ){
     for (int i = 0; i < tokenstogen; i++)
     {
         // std::cout << "Generating token " << i << std::endl;
-        bfloat16* logs = (bfloat16*)(logits[0][logits.shape[1]-1]).data;
-        if (logits.device == DEVICE::CUDA){
-            logs =(bfloat16*) malloc(logits.shape[2] * sizeof(bfloat16));
-            cudaMemcpy(logs, logits[0][logits.shape[1]-1].data, logits.shape[2] * sizeof(bfloat16), cudaMemcpyDeviceToHost);
-        }
+        
+        float* logs = (float*)(logits[0][logits.shape[1]-1]).cpu().float32().data;
         ulong sample = 0;
         float max = -99999;
         for (int j = 0; j < logits.shape[2]; j++)
