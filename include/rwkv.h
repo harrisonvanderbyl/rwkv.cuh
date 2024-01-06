@@ -18,8 +18,8 @@ public:
     std::vector<Block> blocks;
     safetensors model;
 
-    ulong layers;
-    ulong max_batch_seq = 0;
+    size_t layers;
+    size_t max_batch_seq = 0;
 
     RWKV(std::string path)
     {
@@ -55,7 +55,7 @@ public:
         }
     }
 
-    Tensor operator()(std::vector<std::vector<ulong>> input)
+    Tensor operator()(std::vector<std::vector<size_t>> input)
     {
         auto x = emb1(input);
         x = ln0(x);

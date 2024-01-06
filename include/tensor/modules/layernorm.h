@@ -36,6 +36,8 @@ class LayerNorm
                 buffer = Tensor({input.shape[0],input.shape[1], input.shape[2]}, input.dtype, input.device);
             }
             
+            this->buffer.empty();
+
             return input.normalize(this->weight, this->bias, buffer, this->heads, this->eps).cloneWithFalseReshape({input.shape[0],input.shape[1], input.shape[2]});
         }
 

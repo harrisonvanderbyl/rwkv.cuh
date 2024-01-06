@@ -21,23 +21,6 @@
 #define AVXONLY(x) x
 #endif
 
-AVXONLY(
-
-// fma simd
-__attribute__ ((target ("fma")))
-__m256 fma (__m256 a, __m256 b, __m256 c){
-    return _mm256_fmadd_ps(a, b, c);
-}
-
-
-// __attribute__ ((target ("default")))
-// __m256 fma (__m256 a, __m256 b, __m256 c){
-//     throw std::runtime_error("fma not implemented for this architecture");
-// }
-
-
-
-)
 
 // simd width
 AVXONLY(
@@ -82,12 +65,14 @@ __m256 _mm256_exp_ps(__m256 x){
     return _mm256_set_ps(exp(x[7]), exp(x[6]), exp(x[5]), exp(x[4]), exp(x[3]), exp(x[2]), exp(x[1]), exp(x[0]));
 }
 
-#endif
-
 __attribute__ ((target ("avx2")))
 float reduce_float(__m256 x){
     return x[0] + x[1] + x[2] + x[3] + x[4] + x[5] + x[6] + x[7];
 }
+
+#endif
+
+
 
 // simd exp for arm
 ARMONLY(

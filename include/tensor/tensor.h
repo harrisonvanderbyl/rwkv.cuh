@@ -23,7 +23,20 @@ to remove the function from the CPU build
 #if defined(__CUDACC__) || defined(__HIPCC__)
 #include "cuda_runtime.h"
 
+static void check_for_errors (){
+    cudaError_t error = cudaGetLastError();
+    if (error != cudaSuccess){
+        std::cout << "CUDA error: " << cudaGetErrorName(error) << " " << cudaGetErrorString(error) << std::endl;
+        throw std::runtime_error("CUDA error: " + std::string(cudaGetErrorString(error)));
+    }
+}
+
+#else
+static void check_for_errors (){
+    // do nothing
+}
 #endif
+
 #include "malloc.h"
 // define float16 and bfloat16
 // typedef unsigned short float16;

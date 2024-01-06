@@ -21,11 +21,10 @@ class Block
         }
         Tensor operator()(Tensor x){
 
+            // get cuda error
+            check_for_errors();
+
             auto attout = att(ln1(x), x);
-
-            // std::cout << "attout:" << attout << std::endl;
-            // attout:Tensor(0.697127, -0.114128, 0.226859, 0.0695565, , ..., 0.12287, 0.215369, 0.0816482, -0.177626, shape=(1, 18, 2048))
-
             auto ffnout = ffn(ln2(attout), attout);
 
 

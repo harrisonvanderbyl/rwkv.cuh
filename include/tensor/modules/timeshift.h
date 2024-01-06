@@ -9,9 +9,9 @@ class TimeShift
 
         Tensor state;
         
-        ulong max_batch;
-        ulong max_seq;
-        ulong dims;
+        size_t max_batch;
+        size_t max_seq;
+        size_t dims;
         Tensor buffer;
         
         TimeShift(){

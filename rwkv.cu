@@ -8,7 +8,7 @@
 int main( int argc, char** argv ){
 
     std::cout << "Hello World" << std::endl;
-    std::string path = "./model.safetensors";
+    std::string path = "./1b5model.safetensors";
 
     
     RWKVTokenizer worldTokenizer("rwkv_vocab_v20230424.txt");
@@ -35,8 +35,9 @@ int main( int argc, char** argv ){
 
     std::cout << "Model loaded" << std::endl;
 
-    std::cout << "Layers" << model.layers << std::endl;
-    std::cout << "Embed" << model.emb1.weight.shape[0] << "," << model.emb1.weight.shape[1] << std::endl;
+    std::cout << "Layers:" << model.layers << std::endl;
+    std::cout << "Embed:" << model.emb1.weight.shape[0] << "," << model.emb1.weight.shape[1] << std::endl;
+    std::cout << "Head:" << model.blocks[0].att.ln_x.heads << std::endl;
     // model.cuda();
 
     auto logits = model({tokens});
@@ -63,14 +64,14 @@ int main( int argc, char** argv ){
     // std::cout << logits << std::endl;
 
     auto start = std::chrono::high_resolution_clock::now();
-    ulong tokenstogen = 100;
-    std::vector<ulong> generated;
+    size_t tokenstogen = 100;
+    std::vector<size_t> generated;
     for (int i = 0; i < tokenstogen; i++)
     {
         // std::cout << "Generating token " << i << std::endl;
         
         float* logs = (float*)(logits[0][logits.shape[1]-1]).cpu().float32().data;
-        ulong sample = 0;
+        size_t sample = 0;
         float max = -99999;
         for (int j = 0; j < logits.shape[2]; j++)
         {

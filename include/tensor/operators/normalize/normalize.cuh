@@ -7,7 +7,7 @@ template <typename T>
 __global__ void layernorm(T* input, T* output, T* weight, T* bias, size_t size, size_t lastshape, size_t headshape, float eps = 1e-5){
     size_t idx = blockIdx.x * blockDim.x + threadIdx.x;
     if (idx < size){
-        size_t head = idx / headshape;
+        size_t head = idx;
         size_t offset = head * headshape;
         float mean = 0;
         float var = 0;
@@ -32,14 +32,12 @@ void normalize_cuda_kernel(void* input, void* weight, void* bias, void* output, 
         
 
         // one instance per head
-        size_t threads = size / headshape;
+        size_t heads = size / headshape;
+        
 
-        // one thread per element
-        size_t blocks = headshape;
+        dim3 dimBlock(heads);
 
-        dim3 dimBlock(threads);
-
-        dim3 dimGrid(blocks);
+        dim3 dimGrid(1);
 
        
         if (dtype == TENSORTYPE::kFLOAT_32)

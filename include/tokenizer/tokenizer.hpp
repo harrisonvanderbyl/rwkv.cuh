@@ -30,8 +30,8 @@ public:
         while (std::getline(file, line)) {
             // get progress without changing the file position
             // float progress = (float)file.tellg() / (float)std::filesystem::file_size(fileName);
-            // if ((ulong)(progress * 100) > lastintprog) {
-            //     lastintprog = (ulong)(progress * 100);
+            // if ((size_t)(progress * 100) > lastintprog) {
+            //     lastintprog = (size_t)(progress * 100);
             //     // flush
             //     std::cout.flush();
             //     std::cout << "%\r" << "Loading token file:[" << std::string(lastintprog / 2, '=') << std::string(50 - lastintprog / 2, ' ') << "] " << lastintprog ;
@@ -157,7 +157,7 @@ public:
     // More methods to replicate the JavaScript behavior would go here
 
     // Sample print function based on printTokens
-    void printTokens(const std::vector<ulong>& tokens) {
+    void printTokens(const std::vector<size_t>& tokens) {
         for (auto i : tokens) {
             // try {
                 std::vector<uchar> s = idx2token[i];
@@ -173,12 +173,12 @@ public:
     }
 
 
-    std::vector<ulong> encode(const std::string &src) {
+    std::vector<size_t> encode(const std::string &src) {
         std::vector<uchar> srcBytes(src.begin(), src.end());
         return encodeBytes(srcBytes);
     }
 
-    std::string decode(const std::vector<ulong> &tokens) {
+    std::string decode(const std::vector<size_t> &tokens) {
         std::vector<uchar> byteResult = decodeBytes(tokens);
         return std::string(byteResult.begin(), byteResult.end());
     }
@@ -191,15 +191,15 @@ public:
     }
 
 private:
-    std::vector<ulong> encodeBytes(const std::vector<uchar>& src) {
+    std::vector<size_t> encodeBytes(const std::vector<uchar>& src) {
         const size_t srcLen = src.size();
-        std::vector<ulong> tokens;
+        std::vector<size_t> tokens;
         size_t i = 0;
         while (i < srcLen) {
             std::vector<uchar> s(src.begin() + i, src.begin() + i + 1);
             if (i < srcLen - 1) {
-                const ulong s1 = src[i + 1];
-                const ulong s0 = src[i];
+                const size_t s1 = src[i + 1];
+                const size_t s0 = src[i];
                 if (good[s0].find(s1) != good[s0].end()) {
                     std::vector<uchar> sss(src.begin() + i, src.begin() + i + wlen[s0]);
                     auto matchIt = std::find_if(table[s0][s1].begin(), table[s0][s1].end(),
@@ -216,9 +216,9 @@ private:
         return tokens;
     }
 
-    std::vector<uchar> decodeBytes(const std::vector<ulong> &tokens) {
+    std::vector<uchar> decodeBytes(const std::vector<size_t> &tokens) {
         std::vector<uchar> decoded;
-        for (ulong token : tokens) {
+        for (size_t token : tokens) {
             const std::vector<uchar> &tokenBytes = idx2token.at(token);
             decoded.insert(decoded.end(), tokenBytes.begin(), tokenBytes.end());
         }
@@ -230,9 +230,9 @@ private:
 };
 
 
-// ulong main() {
+// size_t main() {
     
-//     std::vector<ulong> sampleTokens = worldTokenizer.encode("Hello World!");
+//     std::vector<size_t> sampleTokens = worldTokenizer.encode("Hello World!");
 //     std::cout << "Encoded tokens: " << sampleTokens[0] << " " << sampleTokens[1] << std::endl;
 //     std::cout << worldTokenizer.decode({33155, 37576}) << std::endl;
 //     return 0;

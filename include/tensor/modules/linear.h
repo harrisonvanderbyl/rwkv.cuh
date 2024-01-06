@@ -49,6 +49,7 @@ class Linear
             }
             buffer.empty();
 
+
             if (this->quantized){
                 return this->weight.matmul(this->range, this->offset, input, buffer).cloneWithFalseReshape({input.shape[0],input.shape[1], weight.shape[0]});
             }else{
