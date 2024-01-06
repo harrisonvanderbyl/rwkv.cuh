@@ -1,17 +1,16 @@
 #include <torch/extension.h>
 #include "ATen/ATen.h"
 #include <algorithm>
-#include <omp.h>
 
 
-void Quantize(torch::Tensor &At, torch::Tensor &Art, torch::Tensor &Aot, torch::Tensor &Aqt, long M, long N, bool addResiduals = true)
+void Quantize(torch::Tensor &At, torch::Tensor &Art, torch::Tensor &Aot, torch::Tensor &Aqt, int64_t M, int64_t N, bool addResiduals = true)
 {
     float *A = At.data_ptr<float>();
     float *Ar = Art.data_ptr<float>();
     float *Ao = Aot.data_ptr<float>();
     u_char *Aq = Aqt.data_ptr<u_char>();
 
-    long i, j;
+    int64_t i, j;
     for (i = 0; i < M; i++)
     {
         float amax = (-1e9);
@@ -39,7 +38,7 @@ void Quantize(torch::Tensor &At, torch::Tensor &Art, torch::Tensor &Aot, torch::
 
             diff += (d - float((int)(d)));
             
-                // std::cout << d[k] << ":" << long(d[k]) << ":" << int((u_char)(int(d[k]))) << ":" << int((u_char)((unsigned int)(d[k]))) << std::endl;
+                // std::cout << d[k] << ":" << int64_t(d[k]) << ":" << int((u_char)(int(d[k]))) << ":" << int((u_char)((unsigned int)(d[k]))) << std::endl;
             Aq[i * N + j] = (u_int8_t)((u_int32_t)(d));
             
         }

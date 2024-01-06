@@ -11,7 +11,7 @@ void lerp_cpu_kernel(void *w, void *A, void *B, void *output, size_t size, size_
     {
         for (size_t i = 0; i < size; i+=simdwidth)
         {
-            float* weight = flp(w) + i % loopsize;
+            float* weight = flp(w) + (i % loopsize);
             simd_lerp(flp(A) + i, flp(B) + i, weight, flp(output) + i);
         }
     }

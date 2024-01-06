@@ -59,6 +59,7 @@ public:
     {
         auto x = emb1(input);
         x = ln0(x);
+
         for (size_t i = 0; i < layers; i++)
         {
             x = blocks[i](x);

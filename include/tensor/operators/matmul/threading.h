@@ -41,13 +41,52 @@ struct MatMulJob
     const void *Ct;
     size_t bbt;
     size_t ii;
-    const size_t INSHAPE;
-    const size_t OUTSHAPE;
+    size_t INSHAPE;
+    size_t OUTSHAPE;
     JOBTYPE type = MATMUL;
     const void *ex = nullptr;
-    const size_t H = 0;
-    const size_t hh = 0;
-    const TENSORTYPE dtype = TENSORTYPE::kFLOAT_32;
+    size_t H = 0;
+    size_t hh = 0;
+    TENSORTYPE dtype = TENSORTYPE::kFLOAT_32;
+
+    MatMulJob(
+        u_char *A = nullptr,
+        void *B = nullptr,
+        void *C = nullptr,
+        void *Ao = nullptr,
+        void *Ar = nullptr,
+        void *Bt = nullptr,
+        void *Ct = nullptr,
+         size_t bbt = 1,
+         size_t ii = 0,
+         size_t INSHAPE = 0,
+         size_t OUTSHAPE = 0,
+         JOBTYPE type = MATMUL,
+        void *ex = nullptr,
+         size_t H = 0,
+         size_t hh = 0,
+         TENSORTYPE dtype = TENSORTYPE::kFLOAT_32
+    ){
+        this->A = A;
+        this->B = B;
+        this->C = C;
+        this->Ao = Ao;
+        this->Ar = Ar;
+        this->Bt = Bt;
+        this->Ct = Ct;
+        this->bbt = bbt;
+        this->ii = ii;
+        this->INSHAPE = INSHAPE;
+        this->OUTSHAPE = OUTSHAPE;
+        this->type = type;
+        this->ex = ex;
+        this->H = H;
+        this->hh = hh;
+        this->dtype = dtype;
+
+    }
+
+    
 
     // if convert to size_t, then it will be its own address
     operator size_t() const
@@ -57,25 +96,25 @@ struct MatMulJob
 };
 
 // make compatible with compiler
-std::atomic<size_t> jobs10 = 0;
-std::atomic<size_t> jobs11 = 0;
-std::atomic<size_t> jobs12 = 0;
-std::atomic<size_t> jobs13 = 0;
+std::atomic<size_t> jobs10(0);
+std::atomic<size_t> jobs11(0);
+std::atomic<size_t> jobs12(0);
+std::atomic<size_t> jobs13(0);
 
-std::atomic<size_t> jobs20 = 0;
-std::atomic<size_t> jobs21 = 0;
-std::atomic<size_t> jobs22 = 0;
-std::atomic<size_t> jobs23 = 0;
+std::atomic<size_t> jobs20(0);
+std::atomic<size_t> jobs21(0);
+std::atomic<size_t> jobs22(0);
+std::atomic<size_t> jobs23(0);
 
-std::atomic<size_t> jobs30 = 0;
-std::atomic<size_t> jobs31 = 0;
-std::atomic<size_t> jobs32 = 0;
-std::atomic<size_t> jobs33 = 0;
+std::atomic<size_t> jobs30(0);
+std::atomic<size_t> jobs31(0);
+std::atomic<size_t> jobs32(0);
+std::atomic<size_t> jobs33(0);
 
-std::atomic<size_t> jobs40 = 0;
-std::atomic<size_t> jobs41 = 0;
-std::atomic<size_t> jobs42 = 0;
-std::atomic<size_t> jobs43 = 0;
+std::atomic<size_t> jobs40(0);
+std::atomic<size_t> jobs41(0);
+std::atomic<size_t> jobs42(0);
+std::atomic<size_t> jobs43(0);
 
 void dopartialfp(MatMulJob job);
 void dopartial(MatMulJob job);
@@ -255,35 +294,35 @@ void wkv5_cpu_kernel(void* kk, void* vv, void* ww, void* uu, void* rr, void* ss,
             {
                 auto job1 = MatMulJob{nullptr, out, ww, kk, vv, uu, rr, T, B, C / H, bb, JOBTYPE::RWKV_ATT, ss, H, hh + 0, dtype};
 
-                jobs10 = (uint64_t)&job1;
+                jobs10 = (size_t)&job1;
                 auto job2 = MatMulJob{nullptr, out, ww, kk, vv, uu, rr, T, B, C / H, bb, JOBTYPE::RWKV_ATT, ss, H, hh + 1, dtype};
 
-                jobs12 = (uint64_t)&job2;
+                jobs12 = (size_t)&job2;
                 auto job3 = MatMulJob{nullptr, out, ww, kk, vv, uu, rr, T, B, C / H, bb, JOBTYPE::RWKV_ATT, ss, H, hh + 2, dtype};
 
-                jobs20 = (uint64_t)&job3;
+                jobs20 = (size_t)&job3;
                 auto job4 = MatMulJob{nullptr, out, ww, kk, vv, uu, rr, T, B, C / H, bb, JOBTYPE::RWKV_ATT, ss, H, hh + 3, dtype};
 
-                jobs22 = (uint64_t)&job4;
+                jobs22 = (size_t)&job4;
                 auto job5 = MatMulJob{nullptr, out, ww, kk, vv, uu, rr, T, B, C / H, bb, JOBTYPE::RWKV_ATT, ss, H, hh + 4, dtype};
 
-                jobs30 = (uint64_t)&job5;
+                jobs30 = (size_t)&job5;
                 auto job6 = MatMulJob{nullptr, out, ww, kk, vv, uu, rr, T, B, C / H, bb, JOBTYPE::RWKV_ATT, ss, H, hh + 5, dtype};
 
-                jobs32 = (uint64_t)&job6;
+                jobs32 = (size_t)&job6;
                 auto job7 = MatMulJob{nullptr, out, ww, kk, vv, uu, rr, T, B, C / H, bb, JOBTYPE::RWKV_ATT, ss, H, hh + 6, dtype};
 
-                jobs40 = (uint64_t)&job7;
+                jobs40 = (size_t)&job7;
                 auto job8 = MatMulJob{nullptr, out, ww, kk, vv, uu, rr, T, B, C / H, bb, JOBTYPE::RWKV_ATT, ss, H, hh + 7, dtype};
 
-                jobs42 = (uint64_t)&job8;
+                jobs42 = (size_t)&job8;
 
                 // wait for all jobs to be done
                 while (
-                    jobs10 != 0 || jobs12 != 0 ||
-                    jobs20 != 0 || jobs22 != 0 ||
-                    jobs30 != 0 || jobs32 != 0 ||
-                    jobs40 != 0 || jobs42 != 0)
+                    (jobs10 != 0) || (jobs12 != 0) ||
+                    (jobs20 != 0) || (jobs22 != 0) ||
+                    (jobs30 != 0) || (jobs32 != 0) ||
+                    (jobs40 != 0) || (jobs42 != 0))
                 {
                 }
             }

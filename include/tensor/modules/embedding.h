@@ -13,8 +13,8 @@ class Embedding
         }
         Tensor operator()(std::vector<std::vector<size_t>> indices){
 
-            if (buffer.data == nullptr || buffer.shape[0] * buffer.shape[1] < indices.size() * indices[0].size() || buffer.dtype != weight.dtype || buffer.device != weight.device){
-                buffer = Tensor({indices.size(), indices[0].size(), weight.shape[1]}, weight.dtype, weight.device);
+            if (buffer.data == nullptr || buffer.shape[0] * buffer.shape[1] < indices.size() * indices[0].size() || buffer.dtype != weight.dtype ){
+                buffer = Tensor({indices.size(), indices[0].size(), weight.shape[1]}, weight.dtype, buffer.device);
             }
             
             auto cbuf = buffer.cloneWithFalseReshape({indices.size(), indices[0].size(), weight.shape[1]});
@@ -23,6 +23,6 @@ class Embedding
         }
 
         void cuda(){
-            this->weight = this->weight.cuda();
+            this->buffer = this->buffer.cuda();
         }
 };

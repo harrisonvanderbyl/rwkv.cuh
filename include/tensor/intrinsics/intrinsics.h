@@ -49,7 +49,7 @@ ARMONLY(
 // if using intel compiler, use _mm512_exp_ps
 // if using gcc, use expf
 #if !defined(__INTEL_LLVM_COMPILER)
-
+AVXONLY(
 __attribute__ ((target ("avx512er")))
 __m512 _mm512_exp_ps(__m512 x){
     return _mm512_exp_ps(x);
@@ -65,25 +65,34 @@ __m256 _mm256_exp_ps(__m256 x){
     return _mm256_set_ps(exp(x[7]), exp(x[6]), exp(x[5]), exp(x[4]), exp(x[3]), exp(x[2]), exp(x[1]), exp(x[0]));
 }
 
-__attribute__ ((target ("avx2")))
-float reduce_float(__m256 x){
-    return x[0] + x[1] + x[2] + x[3] + x[4] + x[5] + x[6] + x[7];
-}
 
+)
 #endif
 
 
 
 // simd exp for arm
 ARMONLY(
-    float32x4_t arm_exp(float32x4_t){
-        return vsetq_f32(exp(vgetq_f32(x)[0]), exp(vgetq_f32(x)[1]), exp(vgetq_f32(x)[2]), exp(vgetq_f32(x)[3]));
+    float32x4_t arm_exp(float32x4_t x){
+        float32x4_t xx = vdupq_n_f32(0);
+        xx[0] = exp(x[0]);
+        xx[1] = exp(x[1]);
+        xx[2] = exp(x[2]);
+        xx[3] = exp(x[3]);
+        return xx;
     }
 )
 
 
+
+
 // simd sigmoidmul
 AVXONLY(
+    __attribute__ ((target ("avx2")))
+    float reduce_float(__m256 x){
+        return x[0] + x[1] + x[2] + x[3] + x[4] + x[5] + x[6] + x[7];
+    }
+
     __attribute__ ((target ("avx512f")))
     void simd_sigmoidmul(float* input, float* other, float* residual, float* output){
         _mm512_storeu_ps(output, _mm512_add_ps(_mm512_div_ps(_mm512_loadu_ps(other), _mm512_add_ps(_mm512_set1_ps(1.0f), _mm512_exp_ps(-_mm512_loadu_ps(input)))), _mm512_loadu_ps(residual)));
@@ -198,29 +207,30 @@ AVXONLY(
 )
 
 ARMONLY(
+    __attribute__ ((target ("bf16")))
     void simd_sigmoidmul_bf16(bfloat16* input, bfloat16* other, bfloat16* residual, bfloat16* output){
         // arm neon
         bfloat16x8_t v1 = vld1q_bf16(input);
         bfloat16x8_t v2 = vld1q_bf16(other);
         bfloat16x8_t v3 = vld1q_bf16(residual);
         
-        float32x4_t v1upper = vreinterpretq_f32_bf16(vget_high_bf16(v1));
-        float32x4_t v1lower = vreinterpretq_f32_bf16(vget_low_bf16(v1));
+        float32x4_t v1upper = vcvt_f32_bf16(vget_high_bf16(v1));
+        float32x4_t v1lower = vcvt_f32_bf16(vget_low_bf16(v1));
 
-        float32x4_t v2upper = vreinterpretq_f32_bf16(vget_high_bf16(v2));
-        float32x4_t v2lower = vreinterpretq_f32_bf16(vget_low_bf16(v2));
+        float32x4_t v2upper = vcvt_f32_bf16(vget_high_bf16(v2));
+        float32x4_t v2lower = vcvt_f32_bf16(vget_low_bf16(v2));
 
-        float32x4_t v3upper = vreinterpretq_f32_bf16(vget_high_bf16(v3));
-        float32x4_t v3lower = vreinterpretq_f32_bf16(vget_low_bf16(v3));
+        float32x4_t v3upper = vcvt_f32_bf16(vget_high_bf16(v3));
+        float32x4_t v3lower = vcvt_f32_bf16(vget_low_bf16(v3));
 
-        float32x4_t v4upper vaddq_f32(vdupq_n_f32(1.0f), arm_exp(vnegq_f32(v1upper)));
-        float32x4_t v4lower vaddq_f32(vdupq_n_f32(1.0f), arm_exp(vnegq_f32(v1lower)));
+        float32x4_t v4upper = vaddq_f32(vdupq_n_f32(1.0f), arm_exp(vnegq_f32(v1upper)));
+        float32x4_t v4lower = vaddq_f32(vdupq_n_f32(1.0f), arm_exp(vnegq_f32(v1lower)));
 
         float32x4_t v5upper = vaddq_f32(vdivq_f32(v2upper, v4upper), v3upper);
         float32x4_t v5lower = vaddq_f32(vdivq_f32(v2lower, v4lower), v3lower);
  
 
-        vst1q_bf16(output, vcombine_bf16(vreinterpret_bf16_f32(v5lower), vreinterpret_bf16_f32(v5upper)));
+        vst1q_bf16(output, vcombine_bf16(vcvt_bf16_f32(v5lower), vcvt_bf16_f32(v5upper)));
         // store
     }
 )
@@ -252,7 +262,7 @@ ARMONLY(
         float32x4_t v3 = vaddq_f32(vdupq_n_f32(1.0f), arm_exp(vnegq_f32(v1)));
 
         // return v2 * v1 / v3;
-        vst1q_f32(output, vmulq_f32(v2, vmulq_f32(v1, vrecpeq_f32(v3))));
+        vst1q_f32(output, vmulq_f32(v2, vdivq_f32(v1, v3)));
     }
 )
 
@@ -298,16 +308,17 @@ AVXONLY(
 )
 
 ARMONLY(
+    __attribute__ ((target ("bf16")))
     void simd_swishmul_bf16(bfloat16* input, bfloat16* other, bfloat16* output){
         // arm neon
         bfloat16x8_t v1 = vld1q_bf16(input);
         bfloat16x8_t v2 = vld1q_bf16(other);
         
-        float32x4_t v1upper = vreinterpretq_f32_bf16(vget_high_bf16(v1));
-        float32x4_t v1lower = vreinterpretq_f32_bf16(vget_low_bf16(v1));
+        float32x4_t v1upper = vcvt_f32_bf16(vget_high_bf16(v1));
+        float32x4_t v1lower = vcvt_f32_bf16(vget_low_bf16(v1));
 
-        float32x4_t v2upper = vreinterpretq_f32_bf16(vget_high_bf16(v2));
-        float32x4_t v2lower = vreinterpretq_f32_bf16(vget_low_bf16(v2));
+        float32x4_t v2upper = vcvt_f32_bf16(vget_high_bf16(v2));
+        float32x4_t v2lower = vcvt_f32_bf16(vget_low_bf16(v2));
 
         float32x4_t v3upper = vaddq_f32(vdupq_n_f32(1.0f), arm_exp(vnegq_f32(v1upper)));
         float32x4_t v3lower = vaddq_f32(vdupq_n_f32(1.0f), arm_exp(vnegq_f32(v1lower)));
@@ -315,7 +326,7 @@ ARMONLY(
         float32x4_t v4upper = vmulq_f32(v2upper, vmulq_f32(v1upper, vrecpeq_f32(v3upper)));
         float32x4_t v4lower = vmulq_f32(v2lower, vmulq_f32(v1lower, vrecpeq_f32(v3lower)));
 
-        vst1q_bf16(output, vcombine_bf16(vreinterpret_bf16_f32(v4lower), vreinterpret_bf16_f32(v4upper)));
+        vst1q_bf16(output, vcombine_bf16(vcvt_bf16_f32(v4lower), vcvt_bf16_f32(v4upper)));
 
         // store
     }
@@ -390,11 +401,12 @@ AVXONLY(
 )
 
 ARMONLY(
+    __attribute__ ((target ("bf16")))
     void simd_relusquare_bf16(bfloat16* input, bfloat16* output){
         // arm neon
         bfloat16x8_t v1 = vld1q_bf16(input);
-        float32x4_t v1upper = vreinterpretq_f32_bf16(vget_high_bf16(v1));
-        float32x4_t v1lower = vreinterpretq_f32_bf16(vget_low_bf16(v1));
+        float32x4_t v1upper = vcvt_f32_bf16(vget_high_bf16(v1));
+        float32x4_t v1lower = vcvt_f32_bf16(vget_low_bf16(v1));
 
         float32x4_t v2upper = vmaxq_f32(v1upper, vdupq_n_f32(0.0f));
         float32x4_t v2lower = vmaxq_f32(v1lower, vdupq_n_f32(0.0f));
@@ -402,7 +414,7 @@ ARMONLY(
         float32x4_t v3upper = vmulq_f32(v1upper, v2upper);
         float32x4_t v3lower = vmulq_f32(v1lower, v2lower);
 
-        vst1q_bf16(output, vcombine_bf16(vreinterpret_bf16_f32(v3lower), vreinterpret_bf16_f32(v3upper)));
+        vst1q_bf16(output, vcombine_bf16(vcvt_bf16_f32(v3lower), vcvt_bf16_f32(v3upper)));
         // store
     }
 )
@@ -461,9 +473,13 @@ AVXONLY(
 )
 
 ARMONLY(
+    __attribute__ ((target ("bf16")))
     float simd_accumulate_bf16(bfloat16* input){
         // arm neon
-        return float(input[0]) + float(input[1]) + float(input[2]) + float(input[3]) + float(input[4]) + float(input[5]) + float(input[6]) + float(input[7]);
+        auto a = vcvt_f32_bf16(vld1_bf16(input));
+        auto b = vcvt_f32_bf16(vld1_bf16(input+4));
+
+        return  a[0]+a[1]+a[2]+a[3]+b[0]+b[1]+b[2]+b[3];
     }
 )
 
@@ -500,7 +516,7 @@ ARMONLY(
         float32x4_t v1 = vld1q_f32(input);
         float32x4_t v2 = vsubq_f32(v1, vdupq_n_f32(mean));
         float32x4_t v3 = vmulq_f32(v2, v2);
-        return vaddvq_f32(v3);
+        return v3[0]+v3[1]+v3[2]+v3[3];
     }
 )
 
@@ -543,11 +559,12 @@ AVXONLY(
 )
 
 ARMONLY(
+    __attribute__ ((target ("bf16")))
     float simd_variance_acc_bf16(bfloat16* input, float mean){
         // arm neon
         bfloat16x8_t v1 = vld1q_bf16(input);
-        float32x4_t v1upper = vreinterpretq_f32_bf16(vget_high_bf16(v1));
-        float32x4_t v1lower = vreinterpretq_f32_bf16(vget_low_bf16(v1));
+        float32x4_t v1upper = vcvt_f32_bf16(vget_high_bf16(v1));
+        float32x4_t v1lower = vcvt_f32_bf16(vget_low_bf16(v1));
 
         float32x4_t v2upper = vsubq_f32(v1upper, vdupq_n_f32(mean));
         float32x4_t v2lower = vsubq_f32(v1lower, vdupq_n_f32(mean));
@@ -646,11 +663,12 @@ AVXONLY(
 )
 
 ARMONLY(
+    __attribute__ ((target ("bf16")))
     void simd_norm_assign_bf16(bfloat16* input, float mean, float vareps, bfloat16* weight, bfloat16* bias, bfloat16* output){
         // arm neon
         bfloat16x8_t v1 = vld1q_bf16(input);
-        float32x4_t v1upper = vreinterpretq_f32_bf16(vget_high_bf16(v1));
-        float32x4_t v1lower = vreinterpretq_f32_bf16(vget_low_bf16(v1));
+        float32x4_t v1upper = vcvt_f32_bf16(vget_high_bf16(v1));
+        float32x4_t v1lower = vcvt_f32_bf16(vget_low_bf16(v1));
 
         float32x4_t v2upper = vsubq_f32(v1upper, vdupq_n_f32(mean));
         float32x4_t v2lower = vsubq_f32(v1lower, vdupq_n_f32(mean));
@@ -658,13 +676,13 @@ ARMONLY(
         float32x4_t v3upper = vdivq_f32(v2upper, vdupq_n_f32(vareps));
         float32x4_t v3lower = vdivq_f32(v2lower, vdupq_n_f32(vareps));
 
-        float32x4_t v4upper = vreinterpretq_f32_bf16(vld1q_bf16(weight));
-        float32x4_t v4lower = vreinterpretq_f32_bf16(vld1q_bf16(weight));
+        float32x4_t v4upper = vcvt_f32_bf16(vld1_bf16(weight));
+        float32x4_t v4lower = vcvt_f32_bf16(vld1_bf16(weight+4));
 
-        float32x4_t v5upper = vaddq_f32(vmulq_f32(v3upper, v4upper), vreinterpretq_f32_bf16(vld1q_bf16(bias)));
-        float32x4_t v5lower = vaddq_f32(vmulq_f32(v3lower, v4lower), vreinterpretq_f32_bf16(vld1q_bf16(bias)));
+        float32x4_t v5upper = vaddq_f32(vmulq_f32(v3upper, v4upper), vcvt_f32_bf16(vld1_bf16(bias)));
+        float32x4_t v5lower = vaddq_f32(vmulq_f32(v3lower, v4lower), vcvt_f32_bf16(vld1_bf16(bias+4)));
 
-        vst1q_bf16(output, vcombine_bf16(vreinterpret_bf16_f32(v5lower), vreinterpret_bf16_f32(v5upper)));
+        vst1q_bf16(output, vcombine_bf16(vcvt_bf16_f32(v5lower), vcvt_bf16_f32(v5upper)));
         // store
     }
 )
@@ -775,16 +793,35 @@ AVXONLY(
 )
 
 ARMONLY(
+    __attribute__ ((target ("bf16")))
     void simd_lerp_bf16(bfloat16* input, bfloat16* other, bfloat16* weight, bfloat16* output){
         // arm neon
-        bfloat16x8_t v1 = vld1q_bf16(input);
-        bfloat16x8_t v2 = vld1q_bf16(other);
-        float32x4_t v3 = vsubq_f32(vdupq_n_f32(1.0f), vreinterpretq_f32_bf16(vld1q_bf16(weight)));
-        float32x4_t v4 = vmulq_f32(vreinterpretq_f32_bf16(v1), v3);
-        float32x4_t v5 = vmulq_f32(vreinterpretq_f32_bf16(v2), vreinterpretq_f32_bf16(vld1q_bf16(weight)));
-        float32x4_t v6 = vaddq_f32(v4, v5);
-        vst1q_bf16(output, vcombine_bf16(vreinterpret_bf16_f32(v6), vreinterpret_bf16_f32(v6)));
-        // store
+        auto A = vld1q_bf16(input);
+        auto B = vld1q_bf16(other);
+        auto w = vld1q_bf16(weight);
+
+        auto v1u = vcvt_f32_bf16(vget_high_bf16(A));
+        auto v1l = vcvt_f32_bf16(vget_low_bf16(A));
+
+        auto v2u = vcvt_f32_bf16(vget_high_bf16(B));
+        auto v2l = vcvt_f32_bf16(vget_low_bf16(B));
+
+        auto v3u = vcvt_f32_bf16(vget_high_bf16(w));
+        auto v3l = vcvt_f32_bf16(vget_low_bf16(w));
+
+        auto v4u = vsubq_f32(vdupq_n_f32(1.0f), v3u);
+        auto v4l = vsubq_f32(vdupq_n_f32(1.0f), v3l);
+
+        auto v5u = vmulq_f32(v1u, v4u);
+        auto v5l = vmulq_f32(v1l, v4l);
+
+        auto v6u = vmulq_f32(v2u, v3u);
+        auto v6l = vmulq_f32(v2l, v3l);
+
+        auto v7u = vaddq_f32(v5u, v6u);
+        auto v7l = vaddq_f32(v5l, v6l);
+
+        vst1q_bf16(output, vcombine_bf16(vcvt_bf16_f32(v7l), vcvt_bf16_f32(v7u)));        // store
     }
 )
 

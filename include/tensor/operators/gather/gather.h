@@ -18,9 +18,8 @@ inline Tensor Tensor::operator[](const size_t index) {
 inline Tensor Tensor::gather(std::vector<std::vector<size_t>> indices, Tensor out) {
     
     if (out.data == nullptr) {
-        out = Tensor({indices.size(), indices[0].size(), shape[1]}, dtype, device, device_id);
+        out = Tensor({indices.size(), indices[0].size(), shape[1]}, dtype, out.device, device_id);
     }
-    std::vector<size_t> new_shape = {indices.size(), indices[0].size(), shape[1]};
 
     for (int i = 0; i < indices.size(); i++) {
         for (int j = 0; j < indices[0].size(); j++) {
@@ -28,14 +27,19 @@ inline Tensor Tensor::gather(std::vector<std::vector<size_t>> indices, Tensor ou
                 throw std::invalid_argument("Index out of range");
             }
             
-            if (device == DEVICE::CPU) {
+            if (device == DEVICE::CPU && out.device == DEVICE::CPU) {
                 auto to = out[i][j].data;
                 auto from = (*this)[indices[i][j]].data;
                 memcpy(to, from, shape[1] * get_dtype_bytes(dtype));
-            } else {
+            } else if (device == DEVICE::CPU && out.device == DEVICE::CUDA)
+            {
                 auto to = out[i][j].data;
                 auto from = (*this)[indices[i][j]].data;
                 cudaMemcpy(to, from, shape[1] * get_dtype_bytes(dtype), cudaMemcpyDeviceToDevice);
+            }else{
+                auto to = out[i][j].data;
+                auto from = (*this)[indices[i][j]].data;
+                cudaMemcpy(to, from, shape[1] * get_dtype_bytes(dtype), cudaMemcpyHostToDevice);
             }
         }
     }

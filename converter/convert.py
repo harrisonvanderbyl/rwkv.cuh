@@ -3,12 +3,12 @@ import torch
 
 
 # change path to your model
-path = "./rwkv-26.pth"
+path = "./rwkv-15.pth"
 model = torch.load(path, "cpu")
 
 from torch.utils.cpp_extension import load
 quant_cpp = load(name="quant_cpp", sources=["./quant.cpp"], verbose=True,
-        extra_cflags=["-O3", "-march=native", "-fopenmp"  ,"-flto",  "-fopenmp", "-funroll-loops", "-D_GLIBCXX_PARALLEL"])
+        extra_cflags=["-O3", "-march=native"  ,"-flto", "-funroll-loops", "-D_GLIBCXX_PARALLEL"])
 
 
 import inquirer
@@ -24,11 +24,6 @@ bf16 = mode == "Convert to BF16"
 fp32 = mode == "Convert to FP32"
 uint8 = mode == "Convert to Uint8"
 
-import cpuinfo
-hasbf16 = "avx512_bf16" in cpuinfo.get_cpu_info_json()
-avx512 = "avx512" in cpuinfo.get_cpu_info_json()
-avx2 = "avx2" in cpuinfo.get_cpu_info_json()
-neon = "neon" in cpuinfo.get_cpu_info_json()
 
 # float32= Tensor(-0.477592, -9.87757, -10.544, -9.66997, , ..., -23.7958, -23.7907, -23.739, -23.7474, shape=(1, 18, 65536))
 

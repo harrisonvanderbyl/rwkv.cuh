@@ -74,7 +74,9 @@ class RWKV_5_ATT
             
             
             auto kr = this->time_mix_k.lerp(xx, input, cbuf);
-            auto k = this->key(kr);         
+
+            auto k = this->key(kr);      
+              
             auto vr = this->time_mix_v.lerp(xx, input, cbuf);
             auto v = this->value(vr);
             auto rr = this->time_mix_r.lerp(xx, input, cbuf);
@@ -85,7 +87,6 @@ class RWKV_5_ATT
     
             auto xm = this->state.wkv5(r,k,v,this->time_decay,this->time_faaaa, cbuf);
 
-           
        
             auto xxa = this->ln_x(xm);
 

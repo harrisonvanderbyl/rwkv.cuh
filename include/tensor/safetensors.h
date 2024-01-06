@@ -47,7 +47,7 @@ using json = nlohmann::json;
                 const auto& meta = metas.at(name);
                 char* data_begin = const_cast<char*>(storage) + meta.data_offsets.first;
                 // char* data_end = const_cast<char*>(storage.data()) + meta.data_offsets.second;
-            
+                
                 Tensor tensor = {meta.shape, data_begin, meta.dtype, DEVICE::CPU, 0};
                 return tensor;
             }

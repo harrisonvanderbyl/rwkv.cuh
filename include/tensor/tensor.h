@@ -3,6 +3,17 @@
 #define TENSOR_TENSOR_H
 #include <iostream>
 #include "nlohmann/json.hpp"
+#if defined(__ARM_NEON)
+#define ARMONLY(x) x
+#define AVXONLY(x)
+#include <arm_neon.h>
+#define NEONBF16 __attribute__ ((target ("bf16")))
+#else
+#define ARMONLY(x) 
+#define AVXONLY(x) x
+#define NEONBF16
+#endif
+
 
 /*
 Define 
@@ -37,7 +48,7 @@ static void check_for_errors (){
 }
 #endif
 
-#include "malloc.h"
+
 // define float16 and bfloat16
 // typedef unsigned short float16;
 // typedef unsigned short bfloat16;
@@ -50,6 +61,7 @@ struct float16{
 #include <cuda_bf16.h>
 #define bfloat16 __nv_bfloat16
 #else
+AVXONLY(
 struct bfloat16;
 static float bfloat16_to_float32(bfloat16 value);
 static bfloat16 float32_to_bfloat16(float value);
@@ -83,6 +95,14 @@ static bfloat16 float32_to_bfloat16(float value){
         (uint16_t)inter
     };
 }
+)
+
+#if defined(__ARM_NEON)
+#define bfloat16 __bf16
+#endif
+
+
+
 
 #define cudaMemcpy(...) throw std::runtime_error("Not compiled with cuda")
 #define cudaMalloc(...) throw std::runtime_error("Not compiled with cuda")
@@ -93,10 +113,19 @@ static bfloat16 float32_to_bfloat16(float value){
 
 #endif
 
+#define flp(x) ((float*)(x))
+#define bflp(x) ((bfloat16*)(x))
 
+AVXONLY(
 static std::ostream& operator<<(std::ostream& os, const bfloat16& value){
-    return os << "<" << float(value) << ">";
+    return os << float(value);
+})
+ARMONLY(
+static std::ostream& operator<<(std::ostream& os, const bfloat16& value){
+    auto x = (uint32_t(*(uint16_t*)(&value))<<16);
+    return os << *(float*)&x;
 }
+)
 // bf16 chevrons for std::cout
 
 
@@ -377,9 +406,6 @@ struct Tensor{
             this->data_size_in_bytes *= shape[i];
         }
         posix_memalign(&this->data ,64,this->data_size_in_bytes);
-        // for (size_t i = 0; i < data.size(); i++){
-        //     ((T*)this->data)[i] = data[i];
-        // }
         memcpy(this->data, data.data(), this->data_size_in_bytes);
 
     }
@@ -417,7 +443,9 @@ struct Tensor{
             return *this;
         } else {
             Tensor new_tensor = Tensor(shape, dtype, DEVICE::CUDA, device_id);
-            cudaMemcpy(new_tensor.data, data, data_size_in_bytes, cudaMemcpyHostToDevice);
+            if(data !=nullptr){
+                cudaMemcpy(new_tensor.data, data, data_size_in_bytes, cudaMemcpyHostToDevice);
+            }
             return new_tensor;
         }
     }
@@ -432,15 +460,24 @@ struct Tensor{
         }
     }
 
+    NEONBF16
     Tensor float32(){
         if (dtype == TENSORTYPE::kFLOAT_32){
             return *this;
         } else if (dtype == TENSORTYPE::kBFLOAT_16){
             Tensor new_tensor = Tensor(shape, TENSORTYPE::kFLOAT_32, device, device_id);
 
+            AVXONLY(
             for (size_t i = 0; i < get_element_count(); i++){
-                ((float*)new_tensor.data)[i] = (float)((bfloat16*)data)[i];
+                ((float*)new_tensor.data)[i] = float(((bfloat16*)data)[i]);
+            })
+            ARMONLY(
+            for (size_t i = 0; i < get_element_count(); i+=4){
+                auto vv = vcvt_f32_bf16(vld1_bf16(((bfloat16*)data)+i));
+                vst1q_f32(flp(new_tensor.data)+i,vv);
+
             }
+            )
             
             return new_tensor;
         }

@@ -34,7 +34,7 @@ void normalize_cpu_kernel(void *input, void *weight, void *bias, void *output, f
 
             for (size_t j = i; j < i + headshape; j+= simdwidth)
             {
-                simd_norm_assign(flp(input) + j, mean, vareps, flp(weight) + j % lastshape, flp(bias) + j % lastshape, flp(output) + j);
+                simd_norm_assign(flp(input) + j, mean, vareps, flp(weight) + (j % lastshape), flp(bias) + (j % lastshape), flp(output) + j);
             }
         }
         else if (dtype == TENSORTYPE::kBFLOAT_16)

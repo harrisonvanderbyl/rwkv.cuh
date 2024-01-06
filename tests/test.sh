@@ -9,4 +9,5 @@ export HEADERFILES=$(echo $HEADERFILES | sed 's/ .*//')
 export HEADERFILES="$HEADERFILES -I./../include"
 
 # include debug symbols
-nvcc ./tests.cu ./../src/cpuops.cpp -I$HEADERFILES -L$LIBRARYFILES -o ./testsgpu -arch=sm_80 -g
+# nvcc ./tests.cu ./../src/cpuops.cpp -I$HEADERFILES -L$LIBRARYFILES -o ./testsgpu -arch=sm_80 -g
+g++ ./testscpu.cpp ./../src/cpuops.cpp -I./../include -o ./cputest.out -std=c++11 -g

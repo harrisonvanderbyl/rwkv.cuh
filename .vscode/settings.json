@@ -78,6 +78,7 @@
         "__split_buffer": "cpp",
         "filesystem": "cpp",
         "queue": "cpp",
-        "stack": "cpp"
+        "stack": "cpp",
+        "__mutex_base": "cpp"
     }
 }
