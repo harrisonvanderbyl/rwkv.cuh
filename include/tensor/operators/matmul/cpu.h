@@ -5,7 +5,7 @@
 #include "tensor/tensor.h"
 #include "tensor/intrinsics/intrinsics.h"
 #include "tensor/operators/matmul/threading.h"
-
+AVXONLY(
     __attribute__((target("avx2", "fma"))) void dopartial(MatMulJob job) {
         // do the work
         auto A = job.A;
@@ -205,7 +205,7 @@
     __attribute__((target("default"))) void dopartialfp(MatMulJob job) {
         printf("dopartialfp not implemented for this architecture");
     }
-
+)
 ARMONLY(
 
     __attribute__((target("bf16"))) void dopartialfp(MatMulJob job) {
