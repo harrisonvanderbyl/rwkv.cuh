@@ -7,6 +7,7 @@
 #include "tokenizer/tokenizer.hpp"
 #include "thread"
 #include "atomic"
+#include "sampler/sample.h"
 
 struct wordo {
     std::string word;
@@ -62,7 +63,7 @@ int main( int argc, char** argv ){
 
     RWKVTokenizer worldTokenizer("rwkv_vocab_v20230424.txt");
     
-    std::string instruction = "\n\nSystem: Your role is assist the user in fulfilling their fantasies by creating a world simulation. \n\nUser: ";
+    std::string instruction = "\n\nSystem: Your role is assist the user in fulfilling their fantasies by creating a vivid world simulation. \n\nUser: ";
     
     
     std::cout << instruction;
@@ -96,17 +97,17 @@ int main( int argc, char** argv ){
     {
         // std::cout << "Generating token " << i << std::endl;
         
-        float* logs = (float*)(logits[0][logits.shape[1]-1]).cpu().float32().data;
-        size_t sample = 0;
-        float max = -99999;
-        for (int j = 0; j < logits.shape[2]; j++)
-        {
-            if (float(logs[j]) > max)
-            {
-                max = float(logs[j]);
-                sample = j;
-            }
-        }
+        auto logs =(logits[0][logits.shape[1]-1]).cpu().float32();
+        size_t sample = typical((float*)logs.data);
+        // float max = -99999;
+        // for (int j = 0; j < logits.shape[2]; j++)
+        // {
+        //     if (float(logs[j]) > max)
+        //     {
+        //         max = float(logs[j]);
+        //         sample = j;
+        //     }
+        // }
 
         generated.push_back(sample);
 
@@ -143,7 +144,7 @@ int main( int argc, char** argv ){
                 std::getline(std::cin, input);
                 std::cout << "\n";
                 last = std::chrono::high_resolution_clock::now();
-                logits = model({worldTokenizer.encode("\n\nUser: "+input + "\n\n")});
+                logits = model({worldTokenizer.encode("\n\nUser: "+input + "\n\nSystem:")});
                 
                 
             }else{
