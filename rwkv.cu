@@ -89,37 +89,21 @@ int main( int argc, char** argv ){
     // create thread to flush cout
     std::thread outputthread(outputthreadfunc);
 
-    auto start = std::chrono::high_resolution_clock::now();
-    auto last = start;
-    size_t tokenstogen = 10000000;
-    std::vector<size_t> generated;
-    for (int i = 0; i < tokenstogen; i++)
+    auto last = std::chrono::high_resolution_clock::now();
+    while(1)
     {
         // std::cout << "Generating token " << i << std::endl;
         
         auto logs =(logits[0][logits.shape[1]-1]).cpu().float32();
         size_t sample = typical((float*)logs.data);
-        // float max = -99999;
-        // for (int j = 0; j < logits.shape[2]; j++)
-        // {
-        //     if (float(logs[j]) > max)
-        //     {
-        //         max = float(logs[j]);
-        //         sample = j;
-        //     }
-        // }
+     
 
-        generated.push_back(sample);
 
         std::string output = worldTokenizer.decode({sample});
 
         auto t = std::chrono::high_resolution_clock::now();
 
 
-        // if output ends with User
-        
-            
-            
         // lock cout
             const wordo* cout = coutbuffer.exchange(&wchain1);
 
@@ -143,28 +127,13 @@ int main( int argc, char** argv ){
                 std::string input = "";
                 std::getline(std::cin, input);
                 std::cout << "\n";
-                last = std::chrono::high_resolution_clock::now();
                 logits = model({worldTokenizer.encode("\n\nUser: "+input + "\n\nSystem:")});
-                
+                last = std::chrono::high_resolution_clock::now();
                 
             }else{
                 logits = model({{sample}});
             }
-
-
-        
-        
-
-        
-        // std::cout << logits << std::endl;
     }
-    auto end = std::chrono::high_resolution_clock::now();
-
-    std::cout << std::endl;
-
-    std::cout << "Generated " << tokenstogen << " tokens in " << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count() << "ms" << std::endl;
-    std::cout << "tokens per second: " << (tokenstogen / (std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count() / 1000.0)) << std::endl;
-
     
     return 0;
 }

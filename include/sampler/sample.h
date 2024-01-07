@@ -6,9 +6,26 @@
 
 size_t ALEN = pow(2,16);
 
+void softmax(float* logits)
+{
+    double max = double(*std::max_element(logits, logits+ALEN));
+    double sum = 0;
+    for (size_t i = 0; i < ALEN; i++)
+    {
+        logits[i] -= max;
+        logits[i] = exp(logits[i]);
+        sum += logits[i];
+    }
+    for (size_t i = 0; i < ALEN; i++)
+    {
+        logits[i] /= sum;
+    }
+};
+
 size_t typical(float* logits, double _temp = 0.9, double _tau = 0.9)
 {
     _tau = pow(_tau, 1.0/8.0);
+    softmax(logits);
     double max = double(*std::max_element(logits, logits+ALEN));
     double min = double(*std::min_element(logits, logits+ALEN));
     double range = max - min;
