@@ -36,7 +36,7 @@ AVXONLY(
                 for (size_t b = 0; b < 16; b += 8)
                 {
 
-                    auto zz1 = __m256{0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+                    auto zz1 = __m256{0.0};
                     float* rzz = (float*)&zz1;
 
                     for (auto IAINSHAPE = A + (dii + b) * INSHAPE; IAINSHAPE < A + (dii + b + 8) * INSHAPE; IAINSHAPE += INSHAPE)
