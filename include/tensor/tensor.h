@@ -68,15 +68,15 @@ static bfloat16 float32_to_bfloat16(float value);
 struct bfloat16{
     uint16_t value;
     operator float() const {return bfloat16_to_float32(*this);}
-    bfloat16(double value) {this->value = float32_to_bfloat16((float)value);}
-    bfloat16(float value) {this->value = float32_to_bfloat16(value);}
-    bfloat16(uint16_t value) {this->value = value;}
+    bfloat16(double valuein) {this->value = float32_to_bfloat16((float)valuein);}
+    bfloat16(float valuein) {this->value = float32_to_bfloat16(valuein);}
+    bfloat16(uint16_t valuein) {this->value = valuein;}
     bfloat16() {this->value = 0;}
-    bfloat16 operator = (float value) {this->value = float32_to_bfloat16(value); return *this;}
-    bfloat16 operator = (bfloat16 value) {this->value = value.value; return *this;}
+    bfloat16 operator = (float valuein) {this->value = float32_to_bfloat16(valuein); return *this;}
+    bfloat16 operator = (bfloat16 valuein) {this->value = valuein.value; return *this;}
     // bfloat16 operator = (uint16_t value) {this->value = value; return *this;}
     // bfloat16 operator = (double value) {this->value = float32_to_bfloat16((float)value); return *this;}
-    bfloat16 operator + (bfloat16 value) {return bfloat16(float(*this) + float(value));}
+    bfloat16 operator + (bfloat16 valuein) {return bfloat16(float(*this) + float(valuein));}
     
 };
 
