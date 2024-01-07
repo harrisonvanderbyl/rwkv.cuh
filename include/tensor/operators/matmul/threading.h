@@ -177,8 +177,6 @@ void startWorkers()
     }
     started = true;
 
-    std::cout << "Starting workers" << std::endl;
-
     t1 = new std::thread(listenfunc, &jobs10, &jobs11);
     t2 = new std::thread(listenfunc, &jobs12, &jobs13);
     t3 = new std::thread(listenfunc, &jobs20, &jobs21);
@@ -187,7 +185,6 @@ void startWorkers()
     t6 = new std::thread(listenfunc, &jobs32, &jobs33);
     t7 = new std::thread(listenfunc, &jobs40, &jobs41);
     t8 = new std::thread(listenfunc, &jobs42, &jobs43);
-    std::cout << "Started workers" << std::endl;
 }
 
 void matmul8_cpu_kernal(u_char* A, void* B, void* C, void* Ao, void* Ar, size_t BBT, size_t INSHAPE, size_t OUTSHAPE){  
