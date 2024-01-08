@@ -40,6 +40,8 @@ class Linear
             
         }
         
+        // default copy assignment operator
+        Linear& operator=(const Linear& other) = default;
     
         
         Tensor operator()(Tensor& input) {

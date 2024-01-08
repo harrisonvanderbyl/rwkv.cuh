@@ -3,8 +3,8 @@
 
 #include "tensor/tensor.h"
 
-void relusquare_cpu_kernel(void* input, void* output, int size, TENSORTYPE dtype);
-void relusquare_cuda_kernel(void* input, void* output, int size, TENSORTYPE dtype);
+void relusquare_cpu_kernel(void* input, void* output, size_t size, TENSORTYPE dtype);
+void relusquare_cuda_kernel(void* input, void* output, size_t size, TENSORTYPE dtype);
 
 inline Tensor Tensor::relusquared(){
     Tensor output = *this;

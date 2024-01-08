@@ -5,14 +5,14 @@
 #include "tensor/tensor.h"
 
 __global__ void sigmoidmul_kernel(float *a, float *b, float *residual, float *c, size_t size) {
-    int idx = blockIdx.x * blockDim.x + threadIdx.x;
+    size_t idx = blockIdx.x * blockDim.x + threadIdx.x;
     if (idx < size) {
         c[idx] = (b[idx]) / (1.0f+ exp(-a[idx])) +residual[idx];
     }
 }
 
 __global__ void sigmoidmul_kernel(bfloat16 *a, bfloat16 *b, bfloat16 *residual, bfloat16 *c, size_t size) {
-    int idx = blockIdx.x * blockDim.x + threadIdx.x;
+    size_t idx = blockIdx.x * blockDim.x + threadIdx.x;
     if (idx < size) {
         c[idx] = float(b[idx]) / (1.0f+ exp(float(-a[idx]))) + float(residual[idx]);
     }
@@ -20,8 +20,8 @@ __global__ void sigmoidmul_kernel(bfloat16 *a, bfloat16 *b, bfloat16 *residual, 
 
 void sigmoidmul_cuda_kernel(void* input, void* other, void* residual, void* output, size_t size, TENSORTYPE dtype){
    
-    int threads = 256;
-    int blocks = (size + threads - 1) / threads;
+    size_t threads = 256;
+    size_t blocks = (size + threads - 1) / threads;
 
     if (dtype == TENSORTYPE::kFLOAT_32)
         sigmoidmul_kernel<<<blocks, threads>>>((float*)input, (float*)other, (float*)residual, (float*)output, size);

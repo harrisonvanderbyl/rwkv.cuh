@@ -4,8 +4,8 @@
 #include "cuda_runtime.h"
 
 template <typename T>
-__global__ void relusquare_kernel(T *a, T *b, int size) {
-    int idx = blockIdx.x * blockDim.x + threadIdx.x;
+__global__ void relusquare_kernel(T *a, T *b, size_t size) {
+    size_t idx = blockIdx.x * blockDim.x + threadIdx.x;
     if (idx < size) {
         if (float(a[idx]) > 0) {
             b[idx] = a[idx] * a[idx];
@@ -15,9 +15,9 @@ __global__ void relusquare_kernel(T *a, T *b, int size) {
     }
 }
 
-void relusquare_cuda_kernel(void* input, void* output, int size, TENSORTYPE dtype){
-    int block_size = 512;
-    int grid_size = (size + block_size - 1) / block_size;
+void relusquare_cuda_kernel(void* input, void* output, size_t size, TENSORTYPE dtype){
+    size_t block_size = 512;
+    size_t grid_size = (size + block_size - 1) / block_size;
     if (dtype == TENSORTYPE::kFLOAT_32) {
         relusquare_kernel<float><<<grid_size, block_size>>>((float*)input, (float*)output, size);
     } else if (dtype == TENSORTYPE::kBFLOAT_16) {

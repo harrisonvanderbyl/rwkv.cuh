@@ -436,6 +436,18 @@ struct Tensor{
         this->data = other.data;
     }
 
+    // copy assignment
+    Tensor& operator=(const Tensor& other){
+        this->shape = other.shape;
+        this->dtype = other.dtype;
+        this->device = other.device;
+        this->device_id = other.device_id;
+        this->data_size_in_bytes = other.data_size_in_bytes;
+        this->data = other.data;
+        return *this;
+    }
+    
+
     template <typename T>
     T get(size_t index)const{
         if (device == DEVICE::CUDA){

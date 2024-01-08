@@ -5,7 +5,7 @@
 #include "tensor/intrinsics/intrinsics.h"
 
 
-void swishmul_cpu_kernel(void* input, void* other, void* output, int size, TENSORTYPE dtype){
+void swishmul_cpu_kernel(void* input, void* other, void* output, size_t size, TENSORTYPE dtype){
 
     size_t simdwidth = get_simd_width();
 
