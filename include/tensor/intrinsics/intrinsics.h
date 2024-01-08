@@ -103,10 +103,10 @@ __m256 simdexp256(__m256 xx){
 ARMONLY(
     float32x4_t arm_exp(float32x4_t x){
         float32x4_t xx = vdupq_n_f32(0);
-        xx[0] = exp(-x[0]);
-        xx[1] = exp(-x[1]);
-        xx[2] = exp(-x[2]);
-        xx[3] = exp(-x[3]);
+        xx[0] = exp(x[0]);
+        xx[1] = exp(x[1]);
+        xx[2] = exp(x[2]);
+        xx[3] = exp(x[3]);
         return xx;
     }
 )
