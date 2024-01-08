@@ -32,7 +32,7 @@ enum JOBTYPE
 // create a function that will be called by the thread
 struct MatMulJob
 {
-    const u_char *A = nullptr;
+    const uint8_t *A = nullptr;
     const void *B;
     const void *C;
     const void *Ao;
@@ -50,7 +50,7 @@ struct MatMulJob
     TENSORTYPE dtype = TENSORTYPE::kFLOAT_32;
 
     MatMulJob(
-        u_char *A = nullptr,
+        uint8_t *A = nullptr,
         void *B = nullptr,
         void *C = nullptr,
         void *Ao = nullptr,
@@ -187,7 +187,7 @@ void startWorkers()
     t8 = new std::thread(listenfunc, &jobs42, &jobs43);
 }
 
-void matmul8_cpu_kernal(u_char* A, void* B, void* C, void* Ao, void* Ar, size_t BBT, size_t INSHAPE, size_t OUTSHAPE){  
+void matmul8_cpu_kernal(uint8_t* A, void* B, void* C, void* Ao, void* Ar, size_t BBT, size_t INSHAPE, size_t OUTSHAPE){  
 
     startWorkers();
 
@@ -226,10 +226,10 @@ void matmul8_cpu_kernal(u_char* A, void* B, void* C, void* Ao, void* Ar, size_t 
     jobs43 = job43job;
 
     while (
-        jobs10 != 0 | jobs11 != 0 | jobs12 != 0 | jobs13 != 0 |
-        jobs20 != 0 | jobs21 != 0 | jobs22 != 0 | jobs23 != 0 |
-        jobs30 != 0 | jobs31 != 0 | jobs32 != 0 | jobs33 != 0 |
-        jobs40 != 0 | jobs41 != 0 | jobs42 != 0 | jobs43 != 0)
+        (jobs10 != 0) | (jobs11 != 0) | (jobs12 != 0) | (jobs13 != 0) |
+        (jobs20 != 0) | (jobs21 != 0) | (jobs22 != 0) | (jobs23 != 0) |
+        (jobs30 != 0) | (jobs31 != 0) | (jobs32 != 0) | (jobs33 != 0) |
+        (jobs40 != 0) | (jobs41 != 0) | (jobs42 != 0) | (jobs43 != 0))
     {
     }
 }
@@ -272,10 +272,10 @@ void matmul_cpu_kernal(void* A, void* B, void* C, size_t BBT, size_t INSHAPE, si
     jobs43 = job43job;
 
     while (
-        jobs10 != 0 | jobs11 != 0 | jobs12 != 0 | jobs13 != 0 |
-        jobs20 != 0 | jobs21 != 0 | jobs22 != 0 | jobs23 != 0 |
-        jobs30 != 0 | jobs31 != 0 | jobs32 != 0 | jobs33 != 0 |
-        jobs40 != 0 | jobs41 != 0 | jobs42 != 0 | jobs43 != 0)
+        (jobs10 != 0) | (jobs11 != 0) | (jobs12 != 0) | (jobs13 != 0) |
+        (jobs20 != 0) | (jobs21 != 0) | (jobs22 != 0) | (jobs23 != 0) |
+        (jobs30 != 0) | (jobs31 != 0) | (jobs32 != 0) | (jobs33 != 0) |
+        (jobs40 != 0) | (jobs41 != 0) | (jobs42 != 0) | (jobs43 != 0))
     {
     }
 }

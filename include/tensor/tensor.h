@@ -30,6 +30,15 @@ to remove the function from the CPU build
 
 #endif
 
+// if windows, define posix_memalign
+#if defined(_WIN32) || defined(_WIN64)
+#include <malloc.h>
+static int posix_memalign(void **memptr, size_t alignment, size_t size){
+    *memptr = _aligned_malloc(size, alignment);
+    return 0;
+}
+#endif
+
 // backtrace
 #if defined(__CUDACC__) || defined(__HIPCC__)
 #include "cuda_runtime.h"

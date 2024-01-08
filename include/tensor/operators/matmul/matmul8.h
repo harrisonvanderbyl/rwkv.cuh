@@ -5,8 +5,8 @@
 
 
 
-void matmul8_cpu_kernal(u_char* A, void* B, void* C, void* Ao, void* Ar, size_t BBT, size_t INSHAPE, size_t OUTSHAPE);
-void matmul8_cuda_kernal(u_char* A, void* B, void* C, void* Ao, void* Ar, size_t BBT, size_t INSHAPE, size_t OUTSHAPE);
+void matmul8_cpu_kernal(uint8_t* A, void* B, void* C, void* Ao, void* Ar, size_t BBT, size_t INSHAPE, size_t OUTSHAPE);
+void matmul8_cuda_kernal(uint8_t* A, void* B, void* C, void* Ao, void* Ar, size_t BBT, size_t INSHAPE, size_t OUTSHAPE);
 
 void matmul_cpu_kernal(void* A, void* B, void* C, size_t BBT, size_t INSHAPE, size_t OUTSHAPE, TENSORTYPE dtype);
 void matmul_cuda_kernal(void* A, void* B, void* C, size_t BBT, size_t INSHAPE, size_t OUTSHAPE,TENSORTYPE dtype);
@@ -23,7 +23,7 @@ inline Tensor Tensor::matmul(Tensor &Art, Tensor &Aot,
         printf("only float32 embs allowed for cpu uint8 matmul\n");
         exit(1);
     }
-    const u_char *A = (u_char *)this->data;
+    const uint8_t *A = (uint8_t *)this->data;
     const auto Ar = Art.data;
     const auto Ao = Aot.data;
     const auto B = Bt.data;
@@ -40,13 +40,13 @@ inline Tensor Tensor::matmul(Tensor &Art, Tensor &Aot,
 
     if (Bt.device == DEVICE::CPU)
     {
-        matmul8_cpu_kernal((u_char *)A, (void *)B, (void *)C, (void *)Ao, (void *)Ar, BB * T, INSHAPE, OUTSHAPE);
+        matmul8_cpu_kernal((uint8_t *)A, (void *)B, (void *)C, (void *)Ao, (void *)Ar, BB * T, INSHAPE, OUTSHAPE);
     }
     else CUDAONLY
     {
 
         
-        matmul8_cuda_kernal((u_char *)A, (void *)B, (void *)C, (void *)Ao, (void *)Ar, BB * T, INSHAPE, OUTSHAPE);
+        matmul8_cuda_kernal((uint8_t *)A, (void *)B, (void *)C, (void *)Ao, (void *)Ar, BB * T, INSHAPE, OUTSHAPE);
        
     }
 
@@ -99,7 +99,7 @@ inline Tensor Tensor::wkv5(Tensor &r, Tensor &k, Tensor &v, Tensor &w, Tensor &u
     auto uu = u.data;
     float *ss = (float *)(this->data);
     auto out = y.data;
-    auto dtype = r.dtype;
+    auto rdtype = r.dtype;
 
     uint32_t B = r.shape[0];
     uint32_t T = r.shape[1];
@@ -108,13 +108,13 @@ inline Tensor Tensor::wkv5(Tensor &r, Tensor &k, Tensor &v, Tensor &w, Tensor &u
 
     if (device == DEVICE::CPU)
     {
-        wkv5_cpu_kernel(kk, vv, ww, uu, rr, ss, out, T, B, C, H, dtype);
+        wkv5_cpu_kernel(kk, vv, ww, uu, rr, ss, out, T, B, C, H, rdtype);
     }
     else CUDAONLY
     {
 
         
-        wkv5_cuda_kernel(kk, vv, ww, uu, rr, ss, out, T, B, C, H, dtype);
+        wkv5_cuda_kernel(kk, vv, ww, uu, rr, ss, out, T, B, C, H, rdtype);
         
     }
 

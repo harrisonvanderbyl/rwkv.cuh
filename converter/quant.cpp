@@ -8,7 +8,7 @@ void Quantize(torch::Tensor &At, torch::Tensor &Art, torch::Tensor &Aot, torch::
     float *A = At.data_ptr<float>();
     float *Ar = Art.data_ptr<float>();
     float *Ao = Aot.data_ptr<float>();
-    u_char *Aq = Aqt.data_ptr<u_char>();
+    uint8_t *Aq = Aqt.data_ptr<uint8_t>();
 
     int64_t i, j;
     for (i = 0; i < M; i++)
@@ -38,7 +38,7 @@ void Quantize(torch::Tensor &At, torch::Tensor &Art, torch::Tensor &Aot, torch::
 
             diff += (d - float((int)(d)));
             
-                // std::cout << d[k] << ":" << int64_t(d[k]) << ":" << int((u_char)(int(d[k]))) << ":" << int((u_char)((unsigned int)(d[k]))) << std::endl;
+                // std::cout << d[k] << ":" << int64_t(d[k]) << ":" << int((uint8_t)(int(d[k]))) << ":" << int((uint8_t)((unsigned int)(d[k]))) << std::endl;
             Aq[i * N + j] = (u_int8_t)((u_int32_t)(d));
             
         }

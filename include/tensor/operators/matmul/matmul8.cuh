@@ -31,7 +31,7 @@ void matmul_cuda_kernal(void* A, void* B, void* C, size_t BBT, size_t INSHAPE, s
 
 
 
-void matmul8_cuda_kernal(u_char* A, void* B, void* C, void* Ao, void* Ar, size_t BBT, size_t INSHAPE, size_t OUTSHAPE){  
+void matmul8_cuda_kernal(uint8_t* A, void* B, void* C, void* Ao, void* Ar, size_t BBT, size_t INSHAPE, size_t OUTSHAPE){  
    
    
     

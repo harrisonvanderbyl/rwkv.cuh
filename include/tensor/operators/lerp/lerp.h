@@ -11,8 +11,6 @@ inline Tensor Tensor::lerp(Tensor& A, Tensor& B, Tensor& output){
     size_t loopsize = this->get_element_count();
     size_t size = A.get_element_count();
 
-    auto dtype = this->dtype;
-
     if (this->device == DEVICE::CPU){
         lerp_cpu_kernel(this->data, A.data, B.data, output.data, size, loopsize, dtype);
     }
