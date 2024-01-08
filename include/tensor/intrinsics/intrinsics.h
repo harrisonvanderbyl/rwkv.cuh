@@ -3,7 +3,22 @@
 
 #if defined(__ARM_NEON)
 #include <arm_neon.h>
+#if defined(__ARM_FEATURE_BF16_VECTOR_ARITHMETIC)
 #include <arm_bf16.h>
+#endif
+
+// compatibility for vdivq_f32
+#if !defined(vdivq_f32)
+#define vdivq_f32(x,y) vdivcompatq_f32(x,y)
+float32x4_t vdivcompatq_f32(float32x4_t x, float32x4_t y){
+    float32x4_t recip = vrecpeq_f32(y);
+    recip = vmulq_f32(vrecpsq_f32(y, recip), recip);
+    recip = vmulq_f32(vrecpsq_f32(y, recip), recip);
+    return vmulq_f32(x, recip);
+}
+#endif
+
+
 #else
 // if windows, use intrin.h
 #if defined(_WIN32)
@@ -21,7 +36,16 @@
 #if defined(__ARM_NEON)
 #define ARMONLY(x) x
 #define AVXONLY(x)
+
+// if has bf16
+#if defined(__ARM_FEATURE_BF16_VECTOR_ARITHMETIC)
+#define ARMBF16ONLY(x,fallback) x
 #else
+#define ARMBF16ONLY(x,fallback) fallback
+#endif
+
+#else
+#define ARMBF16ONLY(x, fallback)
 #define ARMONLY(x) 
 #define AVXONLY(x) x
 
@@ -33,7 +57,6 @@
 
 #else
 #define TARGETARCH(x)
-
 
 #endif
 
@@ -158,8 +181,7 @@ AVXONLY(
 
 )
 
-ARMONLY(
-    TARGETARCH("bf16")
+ARMBF16ONLY(
     void simd_sigmoidmul_bf16(bfloat16* input, bfloat16* other, bfloat16* residual, bfloat16* output){
         // arm neon
         bfloat16x8_t v1 = vld1q_bf16(input);
@@ -185,6 +207,12 @@ ARMONLY(
         vst1q_bf16(output, vcombine_bf16(vcvt_bf16_f32(v5lower), vcvt_bf16_f32(v5upper)));
         // store
     }
+    ,
+    void simd_sigmoidmul_bf16(bfloat16* input, bfloat16* other, bfloat16* residual, bfloat16* output){
+
+
+    }
+
 )
 
 // swishmul
@@ -228,8 +256,8 @@ AVXONLY(
 
 )
 
-ARMONLY(
-    TARGETARCH("bf16")
+ARMBF16ONLY(
+    
     void simd_swishmul_bf16(bfloat16* input, bfloat16* other, bfloat16* output){
         // arm neon
         bfloat16x8_t v1 = vld1q_bf16(input);
@@ -250,6 +278,9 @@ ARMONLY(
         vst1q_bf16(output, vcombine_bf16(vcvt_bf16_f32(v4lower), vcvt_bf16_f32(v4upper)));
 
         // store
+    },
+    void simd_swishmul_bf16(bfloat16* input, bfloat16* other, bfloat16* output){
+
     }
 )
 
@@ -290,9 +321,8 @@ AVXONLY(
 
 )
 
-ARMONLY(
-    TARGETARCH("bf16")
-    void simd_relusquare_bf16(bfloat16* input, bfloat16* output){
+ARMBF16ONLY(
+        void simd_relusquare_bf16(bfloat16* input, bfloat16* output){
         // arm neon
         bfloat16x8_t v1 = vld1q_bf16(input);
         float32x4_t v1upper = vcvt_f32_bf16(vget_high_bf16(v1));
@@ -306,6 +336,9 @@ ARMONLY(
 
         vst1q_bf16(output, vcombine_bf16(vcvt_bf16_f32(v3lower), vcvt_bf16_f32(v3upper)));
         // store
+    },
+    void simd_relusquare_bf16(bfloat16* input, bfloat16* output){
+
     }
 )
 
@@ -341,14 +374,17 @@ AVXONLY(
 
 )
 
-ARMONLY(
-    TARGETARCH("bf16")
-    float simd_accumulate_bf16(bfloat16* input){
+ARMBF16ONLY(
+        float simd_accumulate_bf16(bfloat16* input){
         // arm neon
         auto a = vcvt_f32_bf16(vld1_bf16(input));
         auto b = vcvt_f32_bf16(vld1_bf16(input+4));
 
         return  a[0]+a[1]+a[2]+a[3]+b[0]+b[1]+b[2]+b[3];
+    }
+    ,
+    float simd_accumulate_bf16(bfloat16* input){
+        return 0;
     }
 )
 
@@ -398,9 +434,8 @@ AVXONLY(
 
 )
 
-ARMONLY(
-    TARGETARCH("bf16")
-    float simd_variance_acc_bf16(bfloat16* input, float mean){
+ARMBF16ONLY(
+        float simd_variance_acc_bf16(bfloat16* input, float mean){
         // arm neon
         bfloat16x8_t v1 = vld1q_bf16(input);
         float32x4_t v1upper = vcvt_f32_bf16(vget_high_bf16(v1));
@@ -413,6 +448,10 @@ ARMONLY(
         float32x4_t v3lower = vmulq_f32(v2lower, v2lower);
 
         return v3upper[0] + v3upper[1] + v3upper[2] + v3upper[3] + v3lower[0] + v3lower[1] + v3lower[2] + v3lower[3];
+    },
+    float simd_variance_acc_bf16(bfloat16* input, float mean){
+
+        return 0;
     }
 )
 
@@ -469,9 +508,8 @@ AVXONLY(
 
 )
 
-ARMONLY(
-    TARGETARCH("bf16")
-    void simd_norm_assign_bf16(bfloat16* input, float mean, float vareps, bfloat16* weight, bfloat16* bias, bfloat16* output){
+ARMBF16ONLY(
+        void simd_norm_assign_bf16(bfloat16* input, float mean, float vareps, bfloat16* weight, bfloat16* bias, bfloat16* output){
         // arm neon
         bfloat16x8_t v1 = vld1q_bf16(input);
         float32x4_t v1upper = vcvt_f32_bf16(vget_high_bf16(v1));
@@ -491,6 +529,9 @@ ARMONLY(
 
         vst1q_bf16(output, vcombine_bf16(vcvt_bf16_f32(v5lower), vcvt_bf16_f32(v5upper)));
         // store
+    },
+    void simd_norm_assign_bf16(bfloat16* input, float mean, float vareps, bfloat16* weight, bfloat16* bias, bfloat16* output){
+
     }
 )
 
@@ -556,9 +597,8 @@ AVXONLY(
 
 )
 
-ARMONLY(
-    TARGETARCH("bf16")
-    void simd_lerp_bf16(bfloat16* input, bfloat16* other, bfloat16* weight, bfloat16* output){
+ARMBF16ONLY(
+        void simd_lerp_bf16(bfloat16* input, bfloat16* other, bfloat16* weight, bfloat16* output){
         // arm neon
         auto A = vld1q_bf16(input);
         auto B = vld1q_bf16(other);
@@ -586,6 +626,9 @@ ARMONLY(
         auto v7l = vaddq_f32(v5l, v6l);
 
         vst1q_bf16(output, vcombine_bf16(vcvt_bf16_f32(v7l), vcvt_bf16_f32(v7u)));        // store
+    },
+    void simd_lerp_bf16(bfloat16* input, bfloat16* other, bfloat16* weight, bfloat16* output){
+
     }
 )
 

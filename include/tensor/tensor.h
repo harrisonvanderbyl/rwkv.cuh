@@ -27,6 +27,11 @@ to remove the function from the CPU build
 #define CUDAONLY
 #else
 #define CUDAONLY if (false)
+#define cudaMemcpy(...) throw std::runtime_error("Not compiled with cuda")
+#define cudaMalloc(...) throw std::runtime_error("Not compiled with cuda")
+#define cudaMemset(...) throw std::runtime_error("Not compiled with cuda")
+#define cudaMallocHost(pointer, size) *pointer = malloc(size)
+
 
 #endif
 
@@ -61,16 +66,35 @@ static void check_for_errors (){
 // define float16 and bfloat16
 // typedef unsigned short float16;
 // typedef unsigned short bfloat16;
+
 struct float16{
     uint16_t fvalue;
     operator uint16_t() const {return fvalue;}
 };
 
-#if defined(__CUDACC__)
+
+#if defined(__ARM_NEON) && defined(__ARM_FEATURE_BF16_VECTOR_ARITHMETIC)
+
+#define bfloat16 __bf16
+
+
+static float bfloat16_to_float32(bfloat16 value){
+    auto x = (uint32_t(*(uint16_t*)(&value))<<16);
+    return *((float*)&x);
+}
+
+#elif defined(__CUDACC__)
+
 #include <cuda_bf16.h>
 #define bfloat16 __nv_bfloat16
+static float bfloat16_to_float32(bfloat16 value){
+    return __nv_bfloat162float(value);
+}
+
 #else
-AVXONLY(
+
+#define BF16FALLBACKS
+
 struct bfloat16;
 static float bfloat16_to_float32(bfloat16 value);
 static bfloat16 float32_to_bfloat16(float value);
@@ -104,37 +128,21 @@ static bfloat16 float32_to_bfloat16(float value){
         (uint16_t)inter
     };
 }
-)
-
-#if defined(__ARM_NEON)
-#define bfloat16 __bf16
-#endif
-
-
-
-
-#define cudaMemcpy(...) throw std::runtime_error("Not compiled with cuda")
-#define cudaMalloc(...) throw std::runtime_error("Not compiled with cuda")
-#define cudaMemset(...) throw std::runtime_error("Not compiled with cuda")
-#define cudaMallocHost(pointer, size) *pointer = malloc(size)
-
-
 
 #endif
+
+
+
+
+
 
 #define flp(x) ((float*)(x))
 #define bflp(x) ((bfloat16*)(x))
 
-AVXONLY(
+
 static std::ostream& operator<<(std::ostream& os, const bfloat16& value){
-    return os << float(value);
-})
-ARMONLY(
-static std::ostream& operator<<(std::ostream& os, const bfloat16& value){
-    auto x = (uint32_t(*(uint16_t*)(&value))<<16);
-    return os << *(float*)&x;
+    return os << bfloat16_to_float32(value);
 }
-)
 // bf16 chevrons for std::cout
 
 
@@ -476,17 +484,9 @@ struct Tensor{
         } else if (dtype == TENSORTYPE::kBFLOAT_16){
             Tensor new_tensor = Tensor(shape, TENSORTYPE::kFLOAT_32, device, device_id);
 
-            AVXONLY(
             for (size_t i = 0; i < get_element_count(); i++){
-                ((float*)new_tensor.data)[i] = float(((bfloat16*)data)[i]);
-            })
-            ARMONLY(
-            for (size_t i = 0; i < get_element_count(); i+=4){
-                auto vv = vcvt_f32_bf16(vld1_bf16(((bfloat16*)data)+i));
-                vst1q_f32(flp(new_tensor.data)+i,vv);
-
+                ((float*)new_tensor.data)[i] = bfloat16_to_float32(((bfloat16*)data)[i]);
             }
-            )
             
             return new_tensor;
         }
