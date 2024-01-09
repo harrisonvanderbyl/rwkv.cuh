@@ -9,6 +9,57 @@
 #include <fstream>
 #include <sstream>
 #include "tokenizer/bytematch.hpp"
+#include <string.h>
+
+
+void chr_cstrlit(unsigned char u, char *buffer, size_t buflen)
+{
+    if (buflen < 2)
+        *buffer = '\0';
+    else if (isprint(u) && u != '\'' && u != '\"' && u != '\\' && u != '\?')
+        sprintf(buffer, "%c", u);
+    else if (buflen < 3)
+        *buffer = '\0';
+    else
+    {
+        switch (u)
+        {
+        case '\a':  strcpy(buffer, "\\a"); break;
+        case '\b':  strcpy(buffer, "\\b"); break;
+        case '\f':  strcpy(buffer, "\\f"); break;
+        case '\n':  strcpy(buffer, "\\n"); break;
+        case '\r':  strcpy(buffer, "\\r"); break;
+        case '\t':  strcpy(buffer, "\\t"); break;
+        case '\v':  strcpy(buffer, "\\v"); break;
+        case '\\':  strcpy(buffer, "\\\\"); break;
+        case '\'':  strcpy(buffer, "\\'"); break;
+        case '\"':  strcpy(buffer, "\\\""); break;
+        case '\?':  strcpy(buffer, "\\\?"); break;
+        default:
+            if (buflen < 5)
+                *buffer = '\0';
+            else
+                sprintf(buffer, "\\%03o", u);
+            break;
+        }
+    }
+}
+
+void str_cstrlit(const char *str, char *buffer, size_t buflen)
+{
+    unsigned char u;
+    size_t len;
+
+    while ((u = (unsigned char)*str++) != '\0')
+    {
+        chr_cstrlit(u, buffer, buflen);
+        if ((len = strlen(buffer)) == 0)
+            return;
+        buffer += len;
+        buflen -= len;
+    }
+    *buffer = '\0';
+}
 
 
 class RWKVTokenizer {
@@ -62,40 +113,95 @@ public:
                 x = std::vector<uchar>(nline2.begin(), nline2.end());
             }
 
-            for (size_t i = 0; i < x.size(); i++) {
-                    if (x[i] == '\\') {
-                        switch (x[i + 1]) {
-                        case 'n':
-                            x[i] = '\n';
-                            break;
-                        case 't':
-                            x[i] = '\t';
-                            break;
-                        case 'r':
-                            x[i] = '\r';
-                            break;
-                        case 'b':
-                            x[i] = '\b';
-                            break;
-                        case 'f':
-                            x[i] = '\f';
-                            break;
-                        case '\\':
-                            x[i] = '\\';
-                            break;
-                        case '\'':
-                            x[i] = '\'';
-                            break;
-                        case '\"':
-                            x[i] = '\"';
-                            break;
-                        case '0':
-                            x[i] = '\0';
-                            break;
-                        }
-                        x.erase(x.begin() + i + 1);
-                    }
+            // for (size_t i = 0; i < x.size(); i++) {
+            // unescape the string
+            // char buffer[5];
+            // str_cstrlit((char*)x.data(), buffer, 5);
+            // }
+
+            // if x = "\xa0\xa0\xa0\xa0\xa0\xa0\xa0\xa0" make it into the string representation
+            if (std::string(x.begin(), x.end()) == "\\xa0\\xa0\\xa0\\xa0\\xa0\\xa0\\xa0\\xa0") {
+                std::string xtr = "\xa0\xa0\xa0\xa0\xa0\xa0\xa0\xa0";
+                x = std::vector<uchar>(xtr.begin(), xtr.end());
             }
+
+            // if x = "\xa0\xa0\xa0\xa0" make it into the string representation
+            if (std::string(x.begin(), x.end()) == "\\xa0\\xa0\\xa0\\xa0") {
+                std::string xtr = "\xa0\xa0\xa0\xa0";
+                x = std::vector<uchar>(xtr.begin(), xtr.end());
+            }
+
+            // if x = "\xa0\xa0\xa0" make it into the string representation
+            if (std::string(x.begin(), x.end()) == "\\xa0\\xa0\\xa0") {
+                std::string xtr = "\xa0\xa0\xa0";
+                x = std::vector<uchar>(xtr.begin(), xtr.end());
+            }
+
+            // if x = "\xa0\xa0" make it into the string representation
+            if (std::string(x.begin(), x.end()) == "\\xa0\\xa0") {
+                std::string xtr = "\xa0\xa0";
+                x = std::vector<uchar>(xtr.begin(), xtr.end());
+            }
+
+            // if x = " \xa0" make it into the string representation
+            if (std::string(x.begin(), x.end()) == " \\xa0") {
+                std::string xtr = " \xa0";
+                x = std::vector<uchar>(xtr.begin(), xtr.end());
+            }
+
+            // if x = " \xad " make it into the string representation
+            if (std::string(x.begin(), x.end()) == " \\xad ") {
+                std::string xtr = " \xad ";
+                x = std::vector<uchar>(xtr.begin(), xtr.end());
+            }
+
+            // if x starts with \x then it is a byte string
+            if (x[0] == '\\' && x[1] == 'x'){
+                // convert to hex
+                std::string hexstr(x.begin() + 2, x.end());
+                std::stringstream ss;
+                ss << std::hex << hexstr;
+                unsigned int n;
+                ss >> n;
+                x = std::vector<uchar>(1, n);
+            }
+
+            std::string str = std::string(x.begin(), x.end());
+            // replace all \n with \n
+            while (str.find("\\n") != std::string::npos)
+            str.replace(str.find("\\n"), 2, "\n");
+            // replace all \t with \t
+            while (str.find("\\t") != std::string::npos)
+            str.replace(str.find("\\t"), 2, "\t");
+            // replace all \r with \r
+            while (str.find("\\r") != std::string::npos)
+            str.replace(str.find("\\r"), 2, "\r");
+
+            // replace all \x with \x
+
+            // replace all 
+            while (str.find("\\\\") != std::string::npos)
+            str.replace(str.find("\\\\"), 2, "[slashslash]");
+
+            // replace all [slashslash] with slash
+            while (str.find("[slashslash]") != std::string::npos)
+            str.replace(str.find("[slashslash]"), 12, "\\");
+
+            // replace all \uXXXX with the unicode character
+            while (str.find("\\u") != std::string::npos) {
+                std::string hexstr(str.begin() + str.find("\\u") + 2, str.begin() + str.find("\\u") + 6);
+                std::stringstream ss;
+                ss << std::hex << hexstr;
+                unsigned int n;
+                ss >> n;
+                char buffer[5];
+                chr_cstrlit(n, buffer, 5);
+                str.replace(str.find("\\u"), 6, buffer);
+            }
+
+
+            x = std::vector<uchar>(str.begin(), str.end());
+
             
             // sorted.push_back(x)
             // #pragma omp critical
