@@ -22,9 +22,8 @@ void softmax(float* logits)
     }
 };
 
-size_t typical(float* logits, double _temp = 0.9, double _tau = 0.9)
+size_t typical(float* logits, double _temp = 3.0, double _tau = 0.6)
 {
-    _tau = pow(_tau, 1.0/8.0);
     softmax(logits);
     double max = double(*std::max_element(logits, logits+ALEN));
     double min = double(*std::min_element(logits, logits+ALEN));
@@ -36,14 +35,17 @@ size_t typical(float* logits, double _temp = 0.9, double _tau = 0.9)
         logits[i] /= range;
     }
     // apply temperature
-    for (size_t i = 0; i < ALEN; i++)
-    {
-        logits[i] = pow(logits[i], 1.0/_temp);
-    }
+    
 
     // get random number between tau and 1
     double r = static_cast <double> (rand()) / static_cast <double> (RAND_MAX);
-    r = r * (1.0 - _tau) + _tau;
+    if(abs(_temp) < 0.0001){
+        _temp = 0.0001;
+    }
+
+    r = pow(r, 1.0/_temp);
+    
+    r = (1.0-r) * (1.0 - _tau) + _tau;
     
     // get the index of the element that is closest to r
     size_t out = 0;
