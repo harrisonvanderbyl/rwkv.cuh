@@ -18,6 +18,9 @@ class LayerNorm
 
         }
 
+        // default copy assignment operator
+        LayerNorm& operator=(const LayerNorm& other) = default;
+
         LayerNorm(){
         }
 

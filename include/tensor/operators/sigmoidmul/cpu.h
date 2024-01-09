@@ -5,7 +5,7 @@
 #include "tensor/intrinsics/intrinsics.h"
 
 
-void sigmoidmul_cpu_kernel(void* input, void* other, void* residual, void* output, int size, TENSORTYPE dtype){
+void sigmoidmul_cpu_kernel(void* input, void* other, void* residual, void* output, size_t size, TENSORTYPE dtype){
 
     size_t simdwidth = get_simd_width();
 

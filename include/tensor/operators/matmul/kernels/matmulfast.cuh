@@ -1,20 +1,20 @@
 #pragma once
 
 __global__ void gemv_quantized_int8(u_int8_t* mat, float* vec, float* res,
-                                    unsigned int n, float* scale, float* zero_point,
-                                    unsigned int num_per_thread) {
+                                    unsigned size_t n, float* scale, float* zero_point,
+                                    unsigned size_t num_per_thread) {
   float sum = 0;
   // each thread load num_per_thread elements from global
-  unsigned int tid = threadIdx.x;
-  unsigned int row = blockIdx.y * blockDim.y + threadIdx.y;
-  unsigned int start_idx = threadIdx.x;
+  unsigned size_t tid = threadIdx.x;
+  unsigned size_t row = blockIdx.y * blockDim.y + threadIdx.y;
+  unsigned size_t start_idx = threadIdx.x;
   double4* mat4 = reinterpret_cast<double4*>(mat);
   double4* vec4 = reinterpret_cast<double4*>(vec);
 
 
 #pragma unroll
   for (int iter = 0; iter < num_per_thread >> 3; iter++) {
-    unsigned int j = start_idx + iter * blockDim.x;
+    unsigned size_t j = start_idx + iter * blockDim.x;
     if (j < n >> 3) {
       double4 vec_val = vec4[j]; // actually float4x2
       double4 mat_val = mat4[row * (n >> 3) + j];
@@ -58,8 +58,8 @@ __global__ void gemv_quantized_int8(u_int8_t* mat, float* vec, float* res,
 
   // Shared mem for partial sums (one per warp in the block)
   static __shared__ float warpLevelSums[SHARED_MEM_MAX_ROWS][WARP_SIZE];
-  const int laneId = threadIdx.x % WARP_SIZE;
-  const int warpId = threadIdx.x / WARP_SIZE;
+  const size_t laneId = threadIdx.x % WARP_SIZE;
+  const size_t warpId = threadIdx.x / WARP_SIZE;
   if (laneId == 0) warpLevelSums[threadIdx.y][warpId] = sum;
   __syncthreads();
   // read from shared memory only if that warp existed
@@ -74,7 +74,7 @@ __global__ void gemv_quantized_int8(u_int8_t* mat, float* vec, float* res,
 }
 
 __device__ __forceinline__ float warpReduceSum(float sum,
-                                               unsigned int threadNum) {
+                                               unsigned size_t threadNum) {
   if (threadNum >= 32)
     sum += __shfl_down_sync(0xffffffff, sum, 16);  // 0-16, 1-17, 2-18, etc.
   if (threadNum >= 16)

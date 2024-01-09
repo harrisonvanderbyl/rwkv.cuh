@@ -4,7 +4,7 @@
 #include "tensor/tensor.h"
 #include "tensor/intrinsics/intrinsics.h"
 
-void relusquare_cpu_kernel(void *input, void *output, int size, TENSORTYPE dtype)
+void relusquare_cpu_kernel(void *input, void *output, size_t size, TENSORTYPE dtype)
 {
     size_t simdwidth = get_simd_width();
     if (dtype == TENSORTYPE::kFLOAT_32)

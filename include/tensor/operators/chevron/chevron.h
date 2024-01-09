@@ -6,7 +6,7 @@
 // chevron for std::cout
 static std::ostream& operator<<(std::ostream& os, const Tensor& t) {
     std::string shapestring = "(";
-    for (int i = 0; i < t.shape.size(); i++) {
+    for (size_t i = 0; i < t.shape.size(); i++) {
         shapestring += std::to_string(t.shape[i]);
         if (i != t.shape.size() - 1) {
             shapestring += ", ";

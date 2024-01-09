@@ -4,7 +4,7 @@
 template <typename T>
 __global__ void lerp_kernel(T *w, T *a, T *b, T* c, size_t size, size_t loopsize) 
 {
-    int idx = blockIdx.x * blockDim.x + threadIdx.x;
+    size_t idx = blockIdx.x * blockDim.x + threadIdx.x;
     if (idx < size) {
         float weight = w[idx%loopsize];
         c[idx] = float(b[idx]) * weight + float(a[idx]) * (1 - weight);
