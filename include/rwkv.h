@@ -7,6 +7,8 @@
 #include "tensor/modules/linear.h"
 #include "tensor/modules/block.h"
 
+void startWorkers(size_t numWorkers = 8);
+
 class RWKV
 {
 
@@ -21,7 +23,7 @@ public:
     size_t layers;
     size_t max_batch_seq = 0;
 
-    RWKV(std::string path)
+    RWKV(std::string path, size_t threadsNum = 8)
     {
         std::ifstream inFile;
         inFile.open(path, std::ios::binary);
@@ -53,6 +55,8 @@ public:
         {
             blocks.push_back(Block(model, i));
         }
+
+        startWorkers(threadsNum);
     }
 
     Tensor operator()(std::vector<std::vector<size_t>> input)

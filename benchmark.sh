@@ -1,1 +1,1 @@
-g++ -x c++ ./benchmark.cpp ./src/cpuops.cpp  -I./include -o ./bench.out -O3 -ffast-math -pthread -std=c++11 
+g++ -x c++ ./benchmark.cpp ./src/cpuops.cpp  -I./include -o ./bench.out -O3 -ffast-math -pthread -std=c++11 -march=native 

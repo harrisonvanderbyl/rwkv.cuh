@@ -9,7 +9,7 @@
 int main( int argc, char** argv ){
 
     std::cout << "Hello World" << std::endl;
-    std::string path = "./model.safetensors";
+    std::string path = "../../../../CUDAMAX/1b5model.safetensors";
 
     
     RWKVTokenizer worldTokenizer("rwkv_vocab_v20230424.txt");
