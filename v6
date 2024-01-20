@@ -1,0 +1,41 @@
+    @MyFunction
+    def att_seq_v6_0(self, x, sx, s, ln_w, ln_b, lx_w, lx_b, x_maa, w_maa, k_maa, v_maa, r_maa, g_maa, tm_w1, tm_w2, td_w1, td_w2, t_decay, t_first, kw, vw, rw, gw, ow, kmx, krx, kmy, kry, vmx, vrx, vmy, vry, rmx, rrx, rmy, rry, gmx, grx, gmy, gry, omx, orx, omy, ory):
+        H = t_decay.shape[0]
+        N = x.shape[-1] // H
+        T = x.shape[0]
+
+        xx = F.layer_norm(x, (x.shape[-1],), weight=ln_w, bias=ln_b)
+        sx = torch.cat((sx.unsqueeze(0), xx[:-1,:])) - xx
+        xxx = xx + sx * x_maa
+        xxx = torch.tanh(xxx @ tm_w1).view(T, 5, -1).transpose(0, 1)
+        xxx = torch.bmm(xxx, tm_w2).view(5, T, -1)
+        mw, mk, mv, mr, mg = xxx.unbind(dim=0)
+
+        wx = xx + sx * (w_maa + mw)
+        kx = xx + sx * (k_maa + mk)
+        vx = xx + sx * (v_maa + mv)
+        rx = xx + sx * (r_maa + mr)
+        gx = xx + sx * (g_maa + mg)
+
+        r = matmul(rx, rw, rmx, rrx, rmy, rry, output_dtype=torch.float32).view(T, H, N).transpose(0, 1)
+        k = matmul(kx, kw, kmx, krx, kmy, kry, output_dtype=torch.float32).view(T, H, N).permute(1, 2, 0)
+        v = matmul(vx, vw, vmx, vrx, vmy, vry, output_dtype=torch.float32).view(T, H, N).transpose(0, 1)
+        g = F.silu(matmul(gx, gw, gmx, grx, gmy, gry))
+
+        w = t_decay.view(1, H, N, 1) + (torch.tanh(wx @ td_w1) @ td_w2).float().view(T, H, N, 1)
+        w = torch.exp(-torch.exp(w.float()))
+        out = torch.empty((T, H, N), dtype=r.dtype, device=r.device)
+        for t in range(T):
+            rt = r[:,t:t+1,:]
+            kt = k[:,:,t:t+1]
+            vt = v[:,t:t+1,:]
+            at = matmul(kt, vt)
+            out[t] = (rt @ (t_first * at + s)).squeeze(1)
+            s = at + w[t] * s
+
+        out = out.reshape(T, H*N)
+        out = F.group_norm(out, num_groups=H, weight=lx_w, bias=lx_b, eps = 64e-5)
+        out = out.to(dtype=x.dtype) * g
+        out = matmul(out, ow, omx, orx, omy, ory)
+
+        return x + out, xx[-1,:], s

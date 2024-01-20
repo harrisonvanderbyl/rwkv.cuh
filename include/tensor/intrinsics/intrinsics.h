@@ -545,7 +545,12 @@ AVXONLY(
     void simd_lerp(float* input, float* other, float* weight, float* output){
         _mm256_storeu_ps(output, _mm256_add_ps(_mm256_mul_ps(_mm256_loadu_ps(input), _mm256_sub_ps(_mm256_set1_ps(1.0f), _mm256_loadu_ps(weight))), _mm256_mul_ps(_mm256_loadu_ps(other), _mm256_loadu_ps(weight))));
     }
-
+    ;
+    void tahn(float* input, float* output){
+        auto e2x = simdexp256(_mm256_mul_ps(_mm256_set1_ps(2.0f), _mm256_loadu_ps(input)));
+        _mm256_storeu_ps(output,(_mm256_div_ps(_mm256_sub_ps(e2x, _mm256_set1_ps(1.0f)), _mm256_add_ps(e2x, _mm256_set1_ps(1.0f)))));
+    }
+    ;
 )
 
 ARMONLY(

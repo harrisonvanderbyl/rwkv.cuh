@@ -79,6 +79,7 @@
         "filesystem": "cpp",
         "queue": "cpp",
         "stack": "cpp",
-        "__mutex_base": "cpp"
+        "__mutex_base": "cpp",
+        "immintrin.h": "c"
     }
 }

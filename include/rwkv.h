@@ -28,6 +28,12 @@ public:
         std::ifstream inFile;
         inFile.open(path, std::ios::binary);
         model = safetensors(inFile);
+
+        for (auto key : model.keys())
+        {
+            if(std::string(key).find("blocks.0.") != std::string::npos)
+                        std::cout << key << std::endl;
+        }
         
 
         auto keys = model.keys();
@@ -36,7 +42,7 @@ public:
         {
             if (std::string(key).find("blocks.") != std::string::npos)
             {
-                if (std::string(key).find("att.time_mix_k") != std::string::npos)
+                if (std::string(key).find("att.time_faaa") != std::string::npos)
                 {
                     layers++;
                 }

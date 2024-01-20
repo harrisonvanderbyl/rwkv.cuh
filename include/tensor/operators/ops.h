@@ -9,6 +9,7 @@
 #include "tensor/operators/lerp/lerp.h"
 #include "tensor/operators/swishmul/swishmul.h"
 #include "tensor/operators/matmul/matmul8.h"
+#include "tensor/operators/tahn/tahn.h"
 
 #if defined(__CUDACC__)
 #include "tensor/operators/swishmul/swishmul.cuh"
