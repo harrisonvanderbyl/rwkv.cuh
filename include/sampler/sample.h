@@ -39,10 +39,10 @@ size_t typical(float* logits, double _temp = 3.0, double _tau = 0.6)
 {
     softmax(logits);
     
-    float sorted_probs[ALEN];
+    float* sorted_probs = new float[ALEN];
     std::copy(logits, logits+ALEN, sorted_probs);
     std::sort(sorted_probs, sorted_probs+ALEN, std::greater<float>());
-    float cumulative_probs[ALEN];
+    float* cumulative_probs = new float[ALEN];
     cumulative_probs[0] = sorted_probs[0];
     for (size_t i = 1; i < ALEN; i++)
     {
