@@ -53,7 +53,7 @@ void outputthreadfunc(){
 int main( int argc, char** argv ){
     coutbuffer.store(&wchain1);
 
-    std::string path = "./model.safetensors";
+    std::string path = "./3b.safetensors";
     if (argc > 1)
     {
         path = argv[1];
@@ -63,7 +63,7 @@ int main( int argc, char** argv ){
 
     RWKVTokenizer worldTokenizer("rwkv_vocab_v20230424.txt");
     
-    std::string instruction = "\n\nSystem: Your role is assist the user by being a moderator for a group of people playing some party games. \n\nHello, welcome. How many people are playing? \n\nUser: ";
+    std::string instruction = "\n\nSystem: Your role is assist the user by being a moderator for a group of people playing some party games. Start by asking the players, then ask what game they want to play. \n\nAssistant: Hello, welcome. How many people are playing? \n\nUser: ";
     
     
     std::cout << instruction;
@@ -95,7 +95,7 @@ int main( int argc, char** argv ){
         // std::cout << "Generating token " << i << std::endl;
         
         auto logs =(logits[0][logits.shape[1]-1]).cpu().float32();
-        size_t sample = typical((float*)logs.data);
+        size_t sample = typical((float*)logs.data, 1.0, 0.6);
      
 
 
@@ -127,7 +127,7 @@ int main( int argc, char** argv ){
                 std::string input = "";
                 std::getline(std::cin, input);
                 std::cout << "\n";
-                logits = model({worldTokenizer.encode("\n\nUser: "+input + "\n\nSystem:")});
+                logits = model({worldTokenizer.encode("\n\nUser: "+input + "\n\nAssistant:")});
                 last = std::chrono::high_resolution_clock::now();
                 
             }else{

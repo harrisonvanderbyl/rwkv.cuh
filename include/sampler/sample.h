@@ -22,48 +22,76 @@ void softmax(float* logits)
     }
 };
 
+/*
+def sample_logits(out, temperature=1.0, top_p=0.8):
+    probs = F.softmax(out.float().cpu(), dim=-1).numpy()
+    sorted_probs = np.sort(probs)[::-1]
+    cumulative_probs = np.cumsum(sorted_probs)
+    cutoff = float(sorted_probs[np.argmax(cumulative_probs > top_p)])
+    probs[probs < cutoff] = 0
+    if temperature != 1.0:
+        probs = probs ** (1.0 / temperature)
+    probs = probs / np.sum(probs)
+    out = np.random.choice(a=len(probs), p=probs)
+    return out*/
+
 size_t typical(float* logits, double _temp = 3.0, double _tau = 0.6)
 {
     softmax(logits);
-    double max = double(*std::max_element(logits, logits+ALEN));
-    double min = double(*std::min_element(logits, logits+ALEN));
-    double range = max - min;
-    // move all elements to positive
+    
+    float sorted_probs[ALEN];
+    std::copy(logits, logits+ALEN, sorted_probs);
+    std::sort(sorted_probs, sorted_probs+ALEN, std::greater<float>());
+    float cumulative_probs[ALEN];
+    cumulative_probs[0] = sorted_probs[0];
+    for (size_t i = 1; i < ALEN; i++)
+    {
+        cumulative_probs[i] = cumulative_probs[i-1] + sorted_probs[i];
+    }
+    float cutoff = sorted_probs[0];
     for (size_t i = 0; i < ALEN; i++)
     {
-        logits[i] -= min;
-        logits[i] /= range;
+        if (cumulative_probs[i] > _tau)
+        {
+            cutoff = sorted_probs[i];
+            break;
+        }
     }
-    // apply temperature
-    
-
-    // get random number between tau and 1
-    double r = static_cast <double> (rand()) / static_cast <double> (RAND_MAX);
-    if(abs(_temp) < 0.0001){
-        _temp = 0.0001;
+    for (size_t i = 0; i < ALEN; i++)
+    {
+        if (logits[i] < cutoff)
+        {
+            logits[i] = 0;
+        }
     }
-
-    r = pow(r, 1.0/_temp);
-    
-    r = (1.0-r) * (1.0 - _tau) + _tau;
-    
-    // get the index of the element that is closest to r
+    if (_temp != 1.0)
+    {
+        for (size_t i = 0; i < ALEN; i++)
+        {
+            logits[i] = pow(logits[i], 1.0/_temp);
+        }
+    }
+    float sum = 0;
+    for (size_t i = 0; i < ALEN; i++)
+    {
+        sum += logits[i];
+    }
+    for (size_t i = 0; i < ALEN; i++)
+    {
+        logits[i] /= sum;
+    }
+    float r = (float)rand() / (float)RAND_MAX;
+    float cumulative = 0;
     size_t out = 0;
-    double min_diff = 1.0;
     for (size_t i = 0; i < ALEN; i++)
     {
-        double diff = (double(logits[i]) - r);
-        if (diff < 0)
+        cumulative += logits[i];
+        if (cumulative > r)
         {
-            diff *= -1;
-        }
-        if (diff < min_diff)
-        {
-            min_diff = diff;
             out = i;
+            break;
         }
     }
-
     return out;
 };
 
