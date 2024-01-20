@@ -63,7 +63,7 @@ int main( int argc, char** argv ){
 
     RWKVTokenizer worldTokenizer("rwkv_vocab_v20230424.txt");
     
-    std::string instruction = "\n\nSystem: Your role is assist the user in fulfilling their fantasies by creating a vivid world simulation. \n\nUser: ";
+    std::string instruction = "\n\nSystem: Your role is assist the user by being a moderator for a group of people playing some party games. \n\nHello, welcome. How many people are playing? \n\nUser: ";
     
     
     std::cout << instruction;
