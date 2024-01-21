@@ -21,7 +21,8 @@ enum JOBTYPE
 {
     MATMUL,
     MATMULFP,
-    RWKV_ATT
+    RWKV_ATT,
+    RWKV_ATT_V6
 };
 
 // create a function that will be called by the thread
@@ -111,7 +112,7 @@ void listenfunc(std::atomic<MatMulJob*> *jobs1, std::atomic<MatMulJob*> *jobs2)
         {
             const auto current = *(MatMulJob *)currenta;
 
-            if (current.type == JOBTYPE::RWKV_ATT)
+            if (current.type == JOBTYPE::RWKV_ATT || current.type == JOBTYPE::RWKV_ATT_V6)
             {
                 dopartialwkv5att(current);
             }
@@ -160,6 +161,8 @@ void startWorkers(size_t threadsNum = 8)
     {
         auto job1 = new std::atomic<MatMulJob *>(nullptr);
         auto job2 = new std::atomic<MatMulJob *>(nullptr);
+        job1->store(nullptr);
+        job2->store(nullptr);
         jobs.push_back(job1);
         jobs.push_back(job2);
         threads.push_back(new std::thread(listenfunc, job1, job2));
@@ -205,11 +208,11 @@ void matmul_cpu_kernal(void* A, void* B, void* C, size_t BBT, size_t INSHAPE, si
     // auto job10job = MatMulJob{nullptr, B, C, A, nullptr, B, C, BBT, 0, INSHAPE, OUTSHAPE, JOBTYPE::MATMULFP,nullptr,0,0, dtype};
     
 
-    for (size_t xc = 0; xc < 8; xc+=ThreadCount)
-    {
-       
+    for (size_t xc = 0; xc < 8 && ((xc)*2)*16 < OUTSHAPE; xc+=ThreadCount)
+    {      
 
-    for (size_t i = 0; i < ThreadCount; i+=1)
+    for (size_t i = 0; i < ThreadCount && ((xc+i)*2)*16 < OUTSHAPE 
+    ; i+=1)
     {
         auto job1 = new MatMulJob{nullptr, B, C, A, nullptr, B, C, BBT, ((xc+i)*2)*16, INSHAPE, OUTSHAPE, JOBTYPE::MATMULFP,nullptr,0,0, dtype};
         auto job2 = new MatMulJob{nullptr, B, C, A, nullptr, B, C, BBT, ((xc+i)*2)*16+16, INSHAPE, OUTSHAPE, JOBTYPE::MATMULFP,nullptr,0,0, dtype};
@@ -239,9 +242,12 @@ void matmul_cpu_kernal(void* A, void* B, void* C, size_t BBT, size_t INSHAPE, si
     }
 }
 
-void wkv5_cpu_kernel(void* kk, void* vv, void* ww, void* uu, void* rr, void* ss, void* out, size_t T, size_t B, size_t C, size_t H, TENSORTYPE dtype){
+void wkv5_cpu_kernel(void* kk, void* vv, void* ww, void* uu, void* rr, void* ss, void* out, size_t T, size_t B, size_t C, size_t H, TENSORTYPE dtype, bool v6){
     
-
+        auto type = JOBTYPE::RWKV_ATT;
+        if(v6){
+            type = JOBTYPE::RWKV_ATT_V6;
+        }
         // #pragma omp parallel for collapse(2) schedule(guided, 64) shared(kk, vv, ww, uu, rr, ss, out)
         for (uint32_t bb = 0; bb < B; bb++)
         {
@@ -258,7 +264,7 @@ void wkv5_cpu_kernel(void* kk, void* vv, void* ww, void* uu, void* rr, void* ss,
 
                 for (size_t i = 0; i < ThreadCount; i+=1)
                 {
-                    auto job1 = new MatMulJob{nullptr, out, ww, kk, vv, uu, rr, T, B, C / H, bb, JOBTYPE::RWKV_ATT, ss, H, hh + (i + xc), dtype};
+                    auto job1 = new MatMulJob{nullptr, out, ww, kk, vv, uu, rr, T, B, C / H, bb, type, ss, H, hh + (i + xc), dtype};
                     jobs[i*2]->store(job1);
                     
                 }

@@ -15,15 +15,20 @@ class FFN
         Linear key;
         Linear value;
         Tensor buffer;
+        bool v6 = false;
 
         FFN(){
         }
         
         FFN(int layerID, safetensors& model){
             std::string prefix = "blocks." + std::to_string(layerID) + ".ffn.";
-
-            this->time_mix_k = model[prefix + "time_mix_k"][0][0];
-            this->time_mix_r = model[prefix + "time_mix_r"][0][0];
+            auto point = "mix";
+            if (!model.contains(prefix + "time_"+point+"_k")){
+                point = "maa";
+                v6 = true;
+            }
+            this->time_mix_k = model[prefix + "time_"+point+"_k"][0][0];
+            this->time_mix_r = model[prefix + "time_"+point+"_r"][0][0];
 
             auto dims = this->time_mix_k.shape[0];
             // std::cout << "dims:" << dims << std::endl;
@@ -44,11 +49,11 @@ class FFN
             
             auto xx = timeshift(input);
 
-            auto kr = time_mix_k.lerp(xx, input, cbuf);
+            auto kr = time_mix_k.lerp(xx, input, cbuf, v6);
             auto k = key(kr);
 
            
-            auto rr = this->time_mix_r.lerp(xx, input, cbuf);
+            auto rr = this->time_mix_r.lerp(xx, input, cbuf, v6);
             auto r = this->receptance(rr);
 
             auto krs = k.relusquared();

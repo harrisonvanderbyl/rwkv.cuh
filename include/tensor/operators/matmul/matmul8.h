@@ -11,8 +11,8 @@ void matmul8_cuda_kernal(uint8_t* A, void* B, void* C, void* Ao, void* Ar, size_
 void matmul_cpu_kernal(void* A, void* B, void* C, size_t BBT, size_t INSHAPE, size_t OUTSHAPE, TENSORTYPE dtype);
 void matmul_cuda_kernal(void* A, void* B, void* C, size_t BBT, size_t INSHAPE, size_t OUTSHAPE,TENSORTYPE dtype);
 
-void wkv5_cpu_kernel(void* kk, void* vv, void* ww, void* uu, void* rr, void* ss, void* out, size_t T, size_t B, size_t C, size_t H, TENSORTYPE dtype);
-void wkv5_cuda_kernel(void* kk, void* vv, void* ww, void* uu, void* rr, void* ss, void* out, size_t T, size_t B, size_t C, size_t H, TENSORTYPE dtype);
+void wkv5_cpu_kernel(void* kk, void* vv, void* ww, void* uu, void* rr, void* ss, void* out, size_t T, size_t B, size_t C, size_t H, TENSORTYPE dtype, bool v6);
+void wkv5_cuda_kernel(void* kk, void* vv, void* ww, void* uu, void* rr, void* ss, void* out, size_t T, size_t B, size_t C, size_t H, TENSORTYPE dtype, bool v6);
 
 inline Tensor Tensor::matmul(Tensor &Art, Tensor &Aot,
                       Tensor &Bt, Tensor Ct)
@@ -53,7 +53,7 @@ inline Tensor Tensor::matmul(Tensor &Art, Tensor &Aot,
     return Ct;
 }
 
-inline Tensor Tensor::matmul(Tensor &Bt, Tensor Ct)
+inline Tensor Tensor::matmul(Tensor Bt, Tensor Ct)
 {
     // Pointers to the data
     if (Bt.dtype != TENSORTYPE::kFLOAT_32 && Bt.dtype != TENSORTYPE::kBFLOAT_16)
@@ -100,6 +100,10 @@ inline Tensor Tensor::wkv5(Tensor &r, Tensor &k, Tensor &v, Tensor &w, Tensor &u
     float *ss = (float *)(this->data);
     auto out = y.data;
     auto rdtype = r.dtype;
+    bool v6 = false;
+    if(w.shape.size() == 3){
+        v6 = true;
+    }
 
     uint32_t B = r.shape[0];
     uint32_t T = r.shape[1];
@@ -108,13 +112,13 @@ inline Tensor Tensor::wkv5(Tensor &r, Tensor &k, Tensor &v, Tensor &w, Tensor &u
 
     if (device == DEVICE::CPU)
     {
-        wkv5_cpu_kernel(kk, vv, ww, uu, rr, ss, out, T, B, C, H, rdtype);
+        wkv5_cpu_kernel(kk, vv, ww, uu, rr, ss, out, T, B, C, H, rdtype, v6);
     }
     else CUDAONLY
     {
 
         
-        wkv5_cuda_kernel(kk, vv, ww, uu, rr, ss, out, T, B, C, H, rdtype);
+        wkv5_cuda_kernel(kk, vv, ww, uu, rr, ss, out, T, B, C, H, rdtype, v6);
         
     }
 

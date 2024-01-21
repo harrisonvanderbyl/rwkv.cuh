@@ -1,0 +1,32 @@
+    @MyFunction
+    def att_seq_v5_2(self, x, sx, s, ln_w, ln_b, lx_w, lx_b, k_mix, v_mix, r_mix, g_mix, t_decay, t_first, kw, vw, rw, gw, ow, kmx, krx, kmy, kry, vmx, vrx, vmy, vry, rmx, rrx, rmy, rry, gmx, grx, gmy, gry, omx, orx, omy, ory):
+        H = t_decay.shape[0]
+        N = x.shape[-1] // H
+        T = x.shape[0]
+        xx = F.layer_norm(x, (x.shape[-1],), weight=ln_w, bias=ln_b)
+        sx = torch.cat((sx.unsqueeze(0), xx[:-1,:]))
+        kx = xx * k_mix + sx * (1 - k_mix)
+        vx = xx * v_mix + sx * (1 - v_mix)
+        rx = xx * r_mix + sx * (1 - r_mix)
+        gx = xx * g_mix + sx * (1 - g_mix)
+
+        r = matmul(rx, rw, rmx, rrx, rmy, rry, output_dtype=torch.float32).view(T, H, N).transpose(0, 1)
+        k = matmul(kx, kw, kmx, krx, kmy, kry, output_dtype=torch.float32).view(T, H, N).permute(1, 2, 0)
+        v = matmul(vx, vw, vmx, vrx, vmy, vry, output_dtype=torch.float32).view(T, H, N).transpose(0, 1)
+        g = F.silu(matmul(gx, gw, gmx, grx, gmy, gry))
+
+        out = torch.empty((T, H, N), dtype=r.dtype, device=r.device)
+        for t in range(T):
+            rt = r[:,t:t+1,:]
+            kt = k[:,:,t:t+1]
+            vt = v[:,t:t+1,:]
+            at = matmul(kt, vt)
+            out[t] = (rt @ (t_first * at + s)).squeeze(1)
+            s = at + t_decay * s
+
+        out = out.reshape(T, H*N)
+        out = F.group_norm(out, num_groups=H, weight=lx_w, bias=lx_b, eps = 64e-5)
+        out = out.to(dtype=x.dtype) * g
+        out = matmul(out, ow, omx, orx, omy, ory)
+
+        return x + out, xx[-1,:], s

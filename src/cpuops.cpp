@@ -8,3 +8,4 @@
 #include "tensor/operators/lerp/cpu.h"
 #include "tensor/operators/matmul/cpu.h"
 #include "tensor/operators/matmul/threading.h"
+#include "tensor/operators/tahn/cpu.h"

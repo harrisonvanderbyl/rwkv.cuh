@@ -29,4 +29,5 @@ void lerp_cpu_kernel(void *w, void *A, void *B, void *output, size_t size, size_
     }
 }
 
+
 #endif // LERP_CPU_H

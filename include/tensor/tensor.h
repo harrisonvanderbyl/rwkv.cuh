@@ -88,7 +88,7 @@ static float bfloat16_to_float32(bfloat16 value){
 #include <cuda_bf16.h>
 #define bfloat16 __nv_bfloat16
 static float bfloat16_to_float32(bfloat16 value){
-    return __nv_bfloat162float(value);
+    return float(value);
 }
 
 #else
@@ -449,7 +449,7 @@ struct Tensor{
     
 
     template <typename T>
-    T get(size_t index)const{
+    T& get(size_t index)const{
         if (device == DEVICE::CUDA){
             T value;
             cudaMemcpy(&value, (void*)((T*)data + index), get_dtype_bytes(dtype), cudaMemcpyDeviceToHost);
@@ -517,9 +517,10 @@ struct Tensor{
 
     Tensor relusquared();
     Tensor sigmoidmul(Tensor& other, Tensor& residual);
-    Tensor lerp(Tensor& A, Tensor& B, Tensor& C);
+    Tensor lerp(Tensor& A, Tensor& B, Tensor& C, bool v6 = false);
     Tensor swishmul(Tensor& other);
-    Tensor matmul(Tensor& other, Tensor residual = Tensor());
+    Tensor tahn();
+    Tensor matmul(Tensor other, Tensor residual = Tensor());
     Tensor matmul(Tensor &Art, Tensor &Aot, Tensor &Bt, Tensor residual = Tensor());
     Tensor normalize(Tensor& weight, Tensor& bias, Tensor& result, size_t heads = 1, float epsilon=1e-5);
     

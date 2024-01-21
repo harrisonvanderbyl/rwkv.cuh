@@ -87,8 +87,8 @@ AVXONLY(
                         {
                             const float *IAINSHAPE = flp(A) + i * INSHAPE;
 
-                            auto sum1 = _mm256_set1_ps(0.0);
-                            auto sum2 = _mm256_set1_ps(0.0);
+                            auto sum1 = _mm256_set1_ps(0.0f);
+                            auto sum2 = _mm256_set1_ps(0.0f);
                             for (uint32_t k = 0; k < INSHAPE; k += 16)
                             {
                                 sum1 = _mm256_fmadd_ps(_mm256_loadu_ps(IAINSHAPE + k), _mm256_loadu_ps(flp(B) + bbt * INSHAPE + k), sum1);
@@ -149,145 +149,145 @@ AVXONLY(
     }
 
 )
-ARMONLY(
+// ARMONLY(
 
-    __attribute__((target("bf16"))) void dopartialfp(MatMulJob job) {
-        // do the work
+//     __attribute__((target("bf16"))) void dopartialfp(MatMulJob job) {
+//         // do the work
 
-        auto A = job.Ao;
-        auto B = job.B;
-        auto C = job.C;
-        auto INSHAPE = job.INSHAPE;
-        auto OUTSHAPE = job.OUTSHAPE;
-        auto Batch = job.bbt;
-        auto ii = job.ii;
-        auto dtype = job.dtype;
+//         auto A = job.Ao;
+//         auto B = job.B;
+//         auto C = job.C;
+//         auto INSHAPE = job.INSHAPE;
+//         auto OUTSHAPE = job.OUTSHAPE;
+//         auto Batch = job.bbt;
+//         auto ii = job.ii;
+//         auto dtype = job.dtype;
 
-        if (dtype == TENSORTYPE::kFLOAT_32)
-        {
-            for (size_t bbt = 0; bbt < Batch; bbt += 1)
-            {
-                for (size_t dii = ii; dii < OUTSHAPE; dii += 16 * 16)
-                {
-                    for (size_t b = 0; b < 16; b += 4)
-                    {
-                        auto zz1 = vld1q_f32(flp(C) + bbt * OUTSHAPE + dii + b);
+//         if (dtype == TENSORTYPE::kFLOAT_32)
+//         {
+//             for (size_t bbt = 0; bbt < Batch; bbt += 1)
+//             {
+//                 for (size_t dii = ii; dii < OUTSHAPE; dii += 16 * 16)
+//                 {
+//                     for (size_t b = 0; b < 16; b += 4)
+//                     {
+//                         auto zz1 = vld1q_f32(flp(C) + bbt * OUTSHAPE + dii + b);
 
-                        for (uint32_t i = dii + b; i < dii + b + 4; i += 1)
-                        {
-                            const float *IAINSHAPE = flp(A) + i * INSHAPE;
+//                         for (uint32_t i = dii + b; i < dii + b + 4; i += 1)
+//                         {
+//                             const float *IAINSHAPE = flp(A) + i * INSHAPE;
 
-                            auto sum1 = vdupq_n_f32(0.0);
-                            auto sum2 = vdupq_n_f32(0.0);
-                            for (uint32_t k = 0; k < INSHAPE; k += 8)
-                            {
-                                sum1 = vmlaq_f32(vld1q_f32(IAINSHAPE + k), vld1q_f32(flp(B) + bbt * INSHAPE + k), sum1);
-                                sum2 = vmlaq_f32(vld1q_f32(IAINSHAPE + k + 4), vld1q_f32(flp(B) + bbt * INSHAPE + k + 4), sum2);
-                            }
+//                             auto sum1 = vdupq_n_f32(0.0);
+//                             auto sum2 = vdupq_n_f32(0.0);
+//                             for (uint32_t k = 0; k < INSHAPE; k += 8)
+//                             {
+//                                 sum1 = vmlaq_f32(vld1q_f32(IAINSHAPE + k), vld1q_f32(flp(B) + bbt * INSHAPE + k), sum1);
+//                                 sum2 = vmlaq_f32(vld1q_f32(IAINSHAPE + k + 4), vld1q_f32(flp(B) + bbt * INSHAPE + k + 4), sum2);
+//                             }
 
-                            sum1 = vaddq_f32(sum1, sum2);
+//                             sum1 = vaddq_f32(sum1, sum2);
 
-                            zz1[i & 3] += sum1[0] + sum1[1] + sum1[2] + sum1[3];
-                        }
+//                             zz1[i & 3] += sum1[0] + sum1[1] + sum1[2] + sum1[3];
+//                         }
 
-                        vst1q_f32(
-                            flp(C) + bbt * OUTSHAPE + dii + b,
-                            zz1);
-                    }
-                }
-            }
-        }
-        else
-        {
-            //  for (size_t bbt = 0; bbt < Batch; bbt += 1)
-            // {
-            //     for (size_t dii = ii; dii < OUTSHAPE; dii += 4 * 16)
-            //     {
+//                         vst1q_f32(
+//                             flp(C) + bbt * OUTSHAPE + dii + b,
+//                             zz1);
+//                     }
+//                 }
+//             }
+//         }
+//         else
+//         {
+//             //  for (size_t bbt = 0; bbt < Batch; bbt += 1)
+//             // {
+//             //     for (size_t dii = ii; dii < OUTSHAPE; dii += 4 * 16)
+//             //     {
 
-            //             float zz1[4] = {0.0};
-            //             _mm256_storeu_ps(
-            //                 &zz1[0],
-            //                 bf16_float32_avx2(
-            //                     _mm_loadu_si128((__m128i_u*)(bflp(C) + bbt * OUTSHAPE + dii))
-            //                 )
-            //                 );
+//             //             float zz1[4] = {0.0};
+//             //             _mm256_storeu_ps(
+//             //                 &zz1[0],
+//             //                 bf16_float32_avx2(
+//             //                     _mm_loadu_si128((__m128i_u*)(bflp(C) + bbt * OUTSHAPE + dii))
+//             //                 )
+//             //                 );
 
-            //             for (uint32_t i = dii; i < dii + 16; i += 1)
-            //             {
-            //                 const bfloat16* IAINSHAPE = bflp(A) + i * INSHAPE;
+//             //             for (uint32_t i = dii; i < dii + 16; i += 1)
+//             //             {
+//             //                 const bfloat16* IAINSHAPE = bflp(A) + i * INSHAPE;
 
-            //                 auto sum1 = _mm256_set1_ps(0.0);
-            //                 for (uint32_t k = 0; k < INSHAPE; k += 16)
-            //                 {
-            //                     sum1 = dotbf16_avx2(sum1, (void*)(IAINSHAPE + k), bflp(B) + bbt * INSHAPE + k);
-            //                 }
+//             //                 auto sum1 = _mm256_set1_ps(0.0);
+//             //                 for (uint32_t k = 0; k < INSHAPE; k += 16)
+//             //                 {
+//             //                     sum1 = dotbf16_avx2(sum1, (void*)(IAINSHAPE + k), bflp(B) + bbt * INSHAPE + k);
+//             //                 }
 
-            //                 zz1[i & 15] += sum1[0] + sum1[1] + sum1[2] + sum1[3] + sum1[4] + sum1[5] + sum1[6] + sum1[7];
-            //             }
+//             //                 zz1[i & 15] += sum1[0] + sum1[1] + sum1[2] + sum1[3] + sum1[4] + sum1[5] + sum1[6] + sum1[7];
+//             //             }
 
-            //             __m256 values = _mm256_loadu_ps(&zz1[0]);
-            //             __m256 values2 = _mm256_loadu_ps(&zz1[8]);
+//             //             __m256 values = _mm256_loadu_ps(&zz1[0]);
+//             //             __m256 values2 = _mm256_loadu_ps(&zz1[8]);
 
-            //             auto values3 = float32_bf16_avx2(values2, values);
+//             //             auto values3 = float32_bf16_avx2(values2, values);
 
-            //             _mm256_storeu_si256((__m256i*)(bflp(C) + bbt * OUTSHAPE + dii), values3);
+//             //             _mm256_storeu_si256((__m256i*)(bflp(C) + bbt * OUTSHAPE + dii), values3);
 
-            //     }
-            // }
-            std::cout << "Fix later, no bf16 matmul;";
-            exit(0);
-        }
-    }
+//             //     }
+//             // }
+//             std::cout << "Fix later, no bf16 matmul;";
+//             exit(0);
+//         }
+//     }
 
-    void dopartial(MatMulJob job) {
-        // do the work
-        auto A = job.A;
-        auto B = job.B;
-        auto C = job.C;
-        auto INSHAPE = job.INSHAPE;
-        auto OUTSHAPE = job.OUTSHAPE;
-        auto Ao = job.Ao;
-        auto Ar = job.Ar;
-        auto Batch = job.bbt;
-        auto ii = job.ii;
-        for (size_t bbt = 0; bbt < Batch; bbt += 1)
-        {
-            for (size_t bii = ii; bii < OUTSHAPE; bii += 16 * 16)
-            {
-                for (size_t i = bii; i < bii + 16; i += 1)
-                {
-                    const auto Ario1 = *(flp(Ar) + i );
-                    const auto Aoio1 = *(flp(Ao) + i ) / Ario1;
+//     void dopartial(MatMulJob job) {
+//         // do the work
+//         auto A = job.A;
+//         auto B = job.B;
+//         auto C = job.C;
+//         auto INSHAPE = job.INSHAPE;
+//         auto OUTSHAPE = job.OUTSHAPE;
+//         auto Ao = job.Ao;
+//         auto Ar = job.Ar;
+//         auto Batch = job.bbt;
+//         auto ii = job.ii;
+//         for (size_t bbt = 0; bbt < Batch; bbt += 1)
+//         {
+//             for (size_t bii = ii; bii < OUTSHAPE; bii += 16 * 16)
+//             {
+//                 for (size_t i = bii; i < bii + 16; i += 1)
+//                 {
+//                     const auto Ario1 = *(flp(Ar) + i );
+//                     const auto Aoio1 = *(flp(Ao) + i ) / Ario1;
 
-                    auto sum1 = vdupq_n_f32(0.0);
-                    auto sum2 = vdupq_n_f32(0.0);
-                    // remember to change this to load from residual
+//                     auto sum1 = vdupq_n_f32(0.0);
+//                     auto sum2 = vdupq_n_f32(0.0);
+//                     // remember to change this to load from residual
 
-                    for (uint32_t k = 0; k < INSHAPE; k += 8)
-                    {
+//                     for (uint32_t k = 0; k < INSHAPE; k += 8)
+//                     {
                         
-                        auto u16_vec = vmovl_u8(vld1_u8((A + i * INSHAPE + k)));
-                        auto inp = vld1q_f32(flp(B) + bbt * INSHAPE + k);
-                        auto inp1 = vld1q_f32(flp(B) + bbt * INSHAPE + k + 4);
+//                         auto u16_vec = vmovl_u8(vld1_u8((A + i * INSHAPE + k)));
+//                         auto inp = vld1q_f32(flp(B) + bbt * INSHAPE + k);
+//                         auto inp1 = vld1q_f32(flp(B) + bbt * INSHAPE + k + 4);
 
-                        // Convert uint8_t values to float32x4_t
-                        // convert uint8_t to uint16_t
-                        auto u32_low_vec = vcvtq_f32_u32(vmovl_u16(vget_low_u16(u16_vec))) + Aoio1;   // Extract lower part and convert to uint32_t
-                        auto u32_high_vec = vcvtq_f32_u32(vmovl_u16(vget_high_u16(u16_vec))) + Aoio1; // Extract upper part and convert to uint32_t
-                        // Load the input float vector
+//                         // Convert uint8_t values to float32x4_t
+//                         // convert uint8_t to uint16_t
+//                         auto u32_low_vec = vcvtq_f32_u32(vmovl_u16(vget_low_u16(u16_vec))) + Aoio1;   // Extract lower part and convert to uint32_t
+//                         auto u32_high_vec = vcvtq_f32_u32(vmovl_u16(vget_high_u16(u16_vec))) + Aoio1; // Extract upper part and convert to uint32_t
+//                         // Load the input float vector
 
-                        // Perform the multiplication with inp vector
-                        sum1 = vmlaq_f32(sum1, u32_low_vec, inp);
-                        sum2 = vmlaq_f32(sum2, u32_high_vec, inp1);
-                    }
+//                         // Perform the multiplication with inp vector
+//                         sum1 = vmlaq_f32(sum1, u32_low_vec, inp);
+//                         sum2 = vmlaq_f32(sum2, u32_high_vec, inp1);
+//                     }
 
-                    sum1 = vaddq_f32(sum1, sum2);
+//                     sum1 = vaddq_f32(sum1, sum2);
 
-                    *(flp(C) + bbt * OUTSHAPE + i ) += (sum1[0] + sum1[1] + sum1[2] + sum1[3]) * Ario1;
-                }
-            }
-        }
-    })
+//                     *(flp(C) + bbt * OUTSHAPE + i ) += (sum1[0] + sum1[1] + sum1[2] + sum1[3]) * Ario1;
+//                 }
+//             }
+//         }
+//     })
 
 void dopartialwkv5att(MatMulJob job)
 {
@@ -304,6 +304,7 @@ void dopartialwkv5att(MatMulJob job)
     auto H = job.H;
     auto hh = job.hh;
     auto dtype = job.dtype;
+    bool v6 = job.type == JOBTYPE::RWKV_ATT_V6;
 
     // 1d
     uint32_t bsize = H * T * CH;
@@ -334,23 +335,30 @@ void dopartialwkv5att(MatMulJob job)
 
             uint32_t iind = bhofseti + i;
             auto hoffseti = hoffset + i;
+
+            auto htimeoffset = t * hsize;
+            auto thofoffseti = htimeoffset + hoffseti;
             auto bbhhofseti = bbhhsize + i * hsize;
 
             float kkk;
             float uuu;
             float rrr;
             float www;
+            auto wind = hoffseti;
+            if (v6){
+                wind = iind;
+            }
             // auto kkk = kk[iind];
             if (dtype == TENSORTYPE::kFLOAT_32)
             {
                 kkk = flp(kk)[iind];
                 uuu = flp(uu)[hoffseti];
                 rrr = flp(rr)[iind];
-                www = flp(ww)[hoffseti] ;
+                www = flp(ww)[wind] ;
             }
             if (dtype == TENSORTYPE::kBFLOAT_16)
             {
-                uint16_t xx[4] = {((uint16_t *)(kk))[iind], ((uint16_t *)(uu))[hoffseti], (((uint16_t *)(rr))[iind]), (((uint16_t *)(ww))[hoffseti])};
+                uint16_t xx[4] = {((uint16_t *)(kk))[iind], ((uint16_t *)(uu))[hoffseti], (((uint16_t *)(rr))[iind]), (((uint16_t *)(ww))[iind])};
                 uint32_t yy[4] = {uint32_t(xx[0]) << 16, uint32_t(xx[1]) << 16, uint32_t(xx[2]) << 16, uint32_t(xx[3]) << 16};
                 kkk = flp(yy)[0];
                 uuu = flp(yy)[1];
