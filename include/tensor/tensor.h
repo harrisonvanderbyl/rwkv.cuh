@@ -451,17 +451,17 @@ struct Tensor{
     template <typename T>
     T& get(size_t index)const{
         if (device == DEVICE::CUDA){
-            T value;
-            cudaMemcpy(&value, (void*)((T*)data + index), get_dtype_bytes(dtype), cudaMemcpyDeviceToHost);
-            return value;
+            T* value = (T*)malloc(get_dtype_bytes(dtype));
+            cudaMemcpy(value, (void*)((T*)data + index), get_dtype_bytes(dtype), cudaMemcpyDeviceToHost);
+            return *value;
         } else if (device == DEVICE::ROCM){
-            T value;
-            cudaMemcpy(&value, (void*)((T*)data + index), get_dtype_bytes(dtype), cudaMemcpyDeviceToHost);
-            return value;
+            T* value = (T*)malloc(get_dtype_bytes(dtype));
+            cudaMemcpy(value, (void*)((T*)data + index), get_dtype_bytes(dtype), cudaMemcpyDeviceToHost);
+            return *value;
         } else if (device == DEVICE::VULKAN){
-            T value;
-            cudaMemcpy(&value, (void*)((T*)data + index), get_dtype_bytes(dtype), cudaMemcpyDeviceToHost);
-            return value;
+            T* value = (T*)malloc(get_dtype_bytes(dtype));
+            cudaMemcpy(value, (void*)((T*)data + index), get_dtype_bytes(dtype), cudaMemcpyDeviceToHost);
+            return *value;
         } else {
             return ((T*)data)[index];
         }
@@ -487,6 +487,21 @@ struct Tensor{
             cudaMemcpy(new_tensor.data, data, data_size_in_bytes, cudaMemcpyDeviceToHost);
             return new_tensor;
         }
+    }
+
+    Tensor transpose(){
+        assert (shape.size() == 2);
+        Tensor new_tensor = Tensor({shape[1], shape[0]}, dtype, device, device_id);
+        if (device == DEVICE::CPU){
+            for (size_t i = 0; i < shape[0]; i++){
+                for (size_t j = 0; j < shape[1]; j++){
+                    new_tensor.get<float>(j * shape[0] + i) = get<float>(i * shape[1] + j);
+                }
+            }
+        } else {
+            throw std::runtime_error("transpose only implemented for CPU");
+        }
+        return new_tensor;
     }
 
     NEONBF16

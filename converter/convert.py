@@ -79,16 +79,16 @@ for key in tqdm.tqdm(keys):
         if bf16:
             model[key] = model[key].bfloat16().clone().cpu().contiguous()
         else:
-            model[key] = model[key].float().clone().cpu().contiguous()\
+            model[key] = model[key].float().clone().cpu().contiguous()
                 
     if "maa_w1" in key or "decay_w1" in key or "decay_w2" in key:
         # transpose
         print("tansposing:"+key)
-        model[key] = model[key].t().contiguous()
+        # model[key] = model[key].t().contiguous().float()
     if "maa_w2" in key:
         #transpose last 2 dims
         print("tansposing:"+key)
-        model[key] = model[key].transpose(-1,-2).contiguous()
+        # model[key] = model[key].transpose(-2,-1).contiguous().float()
     if "decay" in key and not v6:
         print(key)
         if bf16:

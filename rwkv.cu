@@ -53,7 +53,7 @@ void outputthreadfunc(){
 int main( int argc, char** argv ){
     coutbuffer.store(&wchain1);
 
-    std::string path = "./3b.safetensors";
+    std::string path = "./model.safetensors";
     if (argc > 1)
     {
         path = argv[1];
@@ -143,13 +143,13 @@ int main( int argc, char** argv ){
             if (output == "\n\n"){
 
                 // extract command
-                std::string command = lastcommand.substr(lastcommand.find("RUN\n")+4);
-                while (command.find("\nENDRUN") != std::string::npos){
-                    auto commando = command.substr(0, command.find("\nENDRUN"));
-                    // run command
-                    system(commando.c_str()); 
-                    command = command.substr(command.find("\nENDRUN")+7);
-                }
+                // std::string command = lastcommand.substr(lastcommand.find("RUN\n")+4);
+                // while (command.find("\nENDRUN") != std::string::npos){
+                //     auto commando = command.substr(0, command.find("\nENDRUN"));
+                //     // run command
+                //     system(commando.c_str()); 
+                //     command = command.substr(command.find("\nENDRUN")+7);
+                // }
                 
 
                 std::string input = "";

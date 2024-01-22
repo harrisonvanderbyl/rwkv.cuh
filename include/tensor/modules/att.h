@@ -47,12 +47,12 @@ class RWKV_5_ATT
                 v6 = true;
                 // time_mix_w1 = Linear(model, prefix + "time_"+point+"_w1");
                 // time_mix_w2 = Linear(model, prefix + "time_"+point+"_w2");
-                time_mix_x = model[prefix + "time_"+point+"_x"][0][0];
+                time_mix_x = model[prefix + "time_"+point+"_x"];
                 time_mix_w1 = model[prefix + "time_"+point+"_w1"];
                 time_mix_w2 = model[prefix + "time_"+point+"_w2"];
                 time_decay_w1 = model[prefix + "time_decay_w1"];
                 time_decay_w2 = model[prefix + "time_decay_w2"];
-                time_mix_w = model[prefix + "time_"+point+"_w"][0][0];
+                time_mix_w = model[prefix + "time_"+point+"_w"];
                 std::cout << "v6" << std::endl;
                 std::cout << time_mix_w1 << std::endl;
                 std::cout << time_mix_w2 << std::endl;
@@ -109,70 +109,60 @@ class RWKV_5_ATT
             Tensor decay;
             
             if (v6){
-                auto xxx = time_mix_x.lerp(xx, input, cbuf, v6);
-                Tensor bufmak = Tensor({xx.shape[0],xx.shape[1],time_mix_w1.shape[0]}, xx.dtype, xx.device);
-
-                bufmak.empty();
-                Tensor bufmak2 = Tensor({5, xx.shape[0], xx.shape[1], xx.shape[2]}, xx.dtype, xx.device);
-                bufmak2.empty();
-                xxx = time_mix_w1.matmul(xxx, bufmak);
+                auto B = xx.shape[0];
+                auto T = xx.shape[1];
+                auto C = xx.shape[2];
+                auto xxx = time_mix_x.lerp(xx, input, cbuf, v6).reshape({B*T,C}).matmul(time_mix_w1.transpose()).tahn().transpose();
                 
-                xxx = xxx.tahn();
-                
-                for (int i = 0; i < xx.shape[0]; i++){
-                    for (int j = 0; j < xx.shape[1]; j++){
+                // auto rsh = xxx.reshape({5, xxx.shape[0]/5, B*T});
 
-                        bufmak2[0][i][j].copyfrom(time_mix_w);
-                        bufmak2[1][i][j].copyfrom(time_mix_k);
-                        bufmak2[2][i][j].copyfrom(time_mix_v);
-                        bufmak2[3][i][j].copyfrom(time_mix_r);
-                        bufmak2[4][i][j].copyfrom(time_mix_g);
+                auto totranspose = Tensor({5, B*T, xxx.shape[1]/5}, xxx.dtype, xxx.device);
+
+                for (int i = 0; i < totranspose.shape[0]; i++){
+                    for (int k = 0; k < totranspose.shape[1]; k++){
+                        totranspose[i][k].copyfrom(xxx.reshape({B*T,5,xxx.shape[1]/5})[k][i]);
                     }
                 }
 
-                auto clnd = Tensor({
-                    5, 
-                    xxx.shape[0], 
-                    xxx.shape[1], 
-                    xxx.shape[2]/5
+
+
+                // totranspose = totranspose.reshape({5, xxx.shape[0] xxx.shape[1], xxx.shape[2]/5});
                 
-                }, xxx.dtype, xxx.device);
-                clnd.empty();
-                auto rsh = xxx.reshape({xxx.shape[0],xxx.shape[1], 5, xxx.shape[2]/5});
-                
-                for (int i = 0; i < xxx.shape[0]; i++){
-                    for (int j = 0; j < xxx.shape[1]; j++){
-                        clnd[0][i][j].copyfrom(rsh[i][j][0].reshape({this->n_head}));
-                        clnd[1][i][j].copyfrom(rsh[i][j][1].reshape({this->n_head}));
-                        clnd[2][i][j].copyfrom(rsh[i][j][2].reshape({this->n_head}));
-                        clnd[3][i][j].copyfrom(rsh[i][j][3].reshape({this->n_head}));
-                        clnd[4][i][j].copyfrom(rsh[i][j][4].reshape({this->n_head}));
-                    }
+                auto t_mix_w =totranspose[0].matmul(time_mix_w2[0].transpose()).transpose();
+                t_mix_k = totranspose[1].matmul(time_mix_w2[1].transpose()).transpose();
+                t_mix_v = totranspose[2].matmul(time_mix_w2[2].transpose()).transpose();
+                t_mix_r = totranspose[3].matmul(time_mix_w2[3].transpose()).transpose();
+                t_mix_g = totranspose[4].matmul(time_mix_w2[4].transpose()).transpose();
+
+                for (int i = 0; i < t_mix_w.shape[0]; i++){
+                        for (int k = 0; k < t_mix_w.shape[2]; k++){
+                            t_mix_w[i].get<float>(k) += time_mix_w.reshape({time_mix_w.shape[2]}).get<float>(k);
+                            t_mix_k[i].get<float>(k) += time_mix_k.reshape({time_mix_w.shape[2]}).get<float>(k);
+                            t_mix_v[i].get<float>(k) += time_mix_v.reshape({time_mix_w.shape[2]}).get<float>(k);
+                            t_mix_r[i].get<float>(k) += time_mix_r.reshape({time_mix_w.shape[2]}).get<float>(k);
+                            t_mix_g[i].get<float>(k) += time_mix_g.reshape({time_mix_w.shape[2]}).get<float>(k);
+                        }
+                    
                 }
 
-                auto t_mix_w = time_mix_w2[0].matmul( clnd[0] , bufmak2[0]);
-                t_mix_k = time_mix_w2[1].matmul( clnd[1] , bufmak2[1]);
-                t_mix_v = time_mix_w2[2].matmul( clnd[2] , bufmak2[2]);
-                t_mix_r = time_mix_w2[3].matmul( clnd[3] , bufmak2[3]);
-                t_mix_g = time_mix_w2[4].matmul( clnd[4] , bufmak2[4]);
+                t_mix_k = t_mix_k.reshape({B,T,C});
+                t_mix_v = t_mix_v.reshape({B,T,C});
+                t_mix_r = t_mix_r.reshape({B,T,C});
+                t_mix_g = t_mix_g.reshape({B,T,C});
+                t_mix_w = t_mix_w.reshape({B,T,C});
 
-                decay = t_mix_w.lerp(xx, input, cbuf, v6);
+                
+                decay = t_mix_w.lerp(xx, input, cbuf, v6).reshape({B*T,C}).matmul(time_decay_w1.transpose()).tahn().matmul(time_decay_w2.transpose());
 
-                auto temput = Tensor({xx.shape[0],xx.shape[1], time_decay_w1.shape[0]}, xx.dtype, xx.device);
-                temput.empty();
-                temput = time_decay_w1.matmul(decay, temput);
-                decay = temput.tahn();
-                auto temput2 = Tensor({xx.shape[0],xx.shape[1], time_decay_w2.shape[0]}, xx.dtype, xx.device);
-                temput2.empty();
-                for (int i = 0; i < xx.shape[0]; i++){
-                    for (int j = 0; j < xx.shape[1]; j++){
-                        temput2[i][j].copyfrom(time_decay.reshape({time_decay.shape[0]*time_decay.shape[1]*time_decay.shape[2]}));
-                    }
-                }
-                decay = time_decay_w2.matmul(decay, temput2);
+                
+                size_t wid = time_decay.get_element_count();
+
                 for (int i = 0; i < decay.get_element_count(); i++){
                     float a = flp(decay.data)[i];
-                    flp(decay.data)[i] = exp(-exp(a));
+                    flp(decay.data)[i] = float(exp(-exp(double(a
+                     + 
+                        flp(time_decay.data)[i%wid]
+                    ))));
                 }
                 // std::cout << decay << std::endl;
             }else{

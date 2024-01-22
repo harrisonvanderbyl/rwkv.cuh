@@ -81,6 +81,10 @@ AVXONLY(
                 {
                     for (size_t b = 0; b < 16; b += 8)
                     {
+                        if (dii + b >= OUTSHAPE)
+                        {
+                            break;
+                        }
                         auto zz1 = _mm256_loadu_ps(flp(C) + bbt * OUTSHAPE + dii + b);
 
                         for (uint32_t i = dii + b; i < dii + b + 8; i += 1)
@@ -358,7 +362,7 @@ void dopartialwkv5att(MatMulJob job)
             }
             if (dtype == TENSORTYPE::kBFLOAT_16)
             {
-                uint16_t xx[4] = {((uint16_t *)(kk))[iind], ((uint16_t *)(uu))[hoffseti], (((uint16_t *)(rr))[iind]), (((uint16_t *)(ww))[iind])};
+                uint16_t xx[4] = {((uint16_t *)(kk))[iind], ((uint16_t *)(uu))[hoffseti], (((uint16_t *)(rr))[iind]), (((uint16_t *)(ww))[wind])};
                 uint32_t yy[4] = {uint32_t(xx[0]) << 16, uint32_t(xx[1]) << 16, uint32_t(xx[2]) << 16, uint32_t(xx[3]) << 16};
                 kkk = flp(yy)[0];
                 uuu = flp(yy)[1];

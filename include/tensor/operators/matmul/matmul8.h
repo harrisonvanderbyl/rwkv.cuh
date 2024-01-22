@@ -63,30 +63,39 @@ inline Tensor Tensor::matmul(Tensor Bt, Tensor Ct)
     }
     const auto A = this->data;
     const auto B = Bt.data;
+
+    auto Batch = Bt.shape[0];
+    if(Bt.shape.size() == 3){
+        Batch = Bt.shape[0] * Bt.shape[1];
+    }
+
     if (Ct.data == nullptr)
     {
-        Ct = Tensor({Bt.shape[0], Bt.shape[1], this->shape[0]}, Bt.dtype, Bt.device, Bt.device_id);
+        Ct = Tensor({Batch, this->shape[0]}, Bt.dtype, Bt.device, Bt.device_id);
     }
 
     const auto C = Ct.data;
 
-    const size_t BB = Bt.shape[0];
-    const size_t T = Bt.shape[1];
     const size_t INSHAPE = Bt.shape[2];
     const size_t OUTSHAPE = this->shape[0];
 
     if(Bt.device==DEVICE::CPU){
-        matmul_cpu_kernal((void *)A, (void *)B, (void *)C, BB * T, INSHAPE, OUTSHAPE, Bt.dtype);
+        matmul_cpu_kernal((void *)A, (void *)B, (void *)C, Batch, INSHAPE, OUTSHAPE, Bt.dtype);
     } 
     else CUDAONLY
     {
     
         
-        matmul_cuda_kernal((void *)A, (void *)B, (void *)C, BB * T, INSHAPE, OUTSHAPE, Bt.dtype);
+        matmul_cuda_kernal((void *)A, (void *)B, (void *)C, Batch, INSHAPE, OUTSHAPE, Bt.dtype);
         
     }
 
-    return Ct;
+    if (Bt.shape.size() == 3)
+    {
+        return Ct.reshape({Bt.shape[0], Bt.shape[1], this->shape[0]});
+    }
+
+    return Ct.reshape({Bt.shape[0], this->shape[0]});
 }
 
 inline Tensor Tensor::wkv5(Tensor &r, Tensor &k, Tensor &v, Tensor &w, Tensor &u, Tensor &y)
