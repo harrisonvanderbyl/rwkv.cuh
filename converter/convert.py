@@ -1,10 +1,9 @@
 import safetensors.torch as st
 import torch
-
+import os
 
 # change path to your model
-path = "./7B.pth"
-model = torch.load(path, "cpu")
+
 
 from torch.utils.cpp_extension import load
 quant_cpp = load(name="quant_cpp", sources=["./quant.cpp"], verbose=True,
@@ -14,12 +13,20 @@ quant_cpp = load(name="quant_cpp", sources=["./quant.cpp"], verbose=True,
 import inquirer
 
 questions = [
+    inquirer.List('file',
+                message="What file do you want to convert?",
+                choices=[file for file in os.listdir("./") if ".pth" in file],
+            )
+    ,
     inquirer.List('mode',
                 message="What do you want to do?",
                 choices=['Convert to BF16', 'Convert to FP32', 'Convert to Uint8'],
             ),
 ]
-mode = inquirer.prompt(questions)["mode"]
+resp = inquirer.prompt(questions)
+path = resp["file"]
+model = torch.load(path, "cpu")
+mode = resp["mode"]
 bf16 = mode == "Convert to BF16"
 fp32 = mode == "Convert to FP32"
 uint8 = mode == "Convert to Uint8"

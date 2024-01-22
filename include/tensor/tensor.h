@@ -85,10 +85,13 @@ static float bfloat16_to_float32(bfloat16 value){
 
 #elif defined(__CUDACC__)
 
+
 #include <cuda_bf16.h>
 #define bfloat16 __nv_bfloat16
 static float bfloat16_to_float32(bfloat16 value){
-    return __nv_bfloat162float(value);
+
+    return float(value);
+
 }
 
 #else
