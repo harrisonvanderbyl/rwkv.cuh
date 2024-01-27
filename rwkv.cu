@@ -63,7 +63,7 @@ int main( int argc, char** argv ){
 
     RWKVTokenizer worldTokenizer("rwkv_vocab_v20230424.txt");
     
-    std::string instruction = "\n\nSystem: Your role is assist the user in any way they ask \n\nUser: ";
+    std::string instruction = "\n\nsystem: Your role is assist the user in any way they ask \n\nuser: ";
     
     
     std::cout << instruction;
@@ -73,7 +73,7 @@ int main( int argc, char** argv ){
 
     std::cout << "\n";
 
-    auto tokens = worldTokenizer.encode(instruction + input+ "\n\n" + "System:");
+    auto tokens = worldTokenizer.encode(instruction + input+ "\n\n" + "assistant:");
 
     if (argc > 2)
     {
@@ -95,7 +95,7 @@ int main( int argc, char** argv ){
         // std::cout << "Generating token " << i << std::endl;
         
         auto logs =(logits[0][logits.shape[1]-1]).cpu().float32();
-        size_t sample = dart((float*)logs.data, 1.0, 0.0);
+        size_t sample = typical((float*)logs.data, 2.0, 0.5);
      
 
 
@@ -109,7 +109,7 @@ int main( int argc, char** argv ){
 
             auto vnn = output;
             if (output == "\n\n"){
-                vnn += "User: ";
+                vnn += "user: ";
             }
             
             if (cout->count == wchain2.count){
@@ -127,7 +127,7 @@ int main( int argc, char** argv ){
                 std::string input = "";
                 std::getline(std::cin, input);
                 std::cout << "\n";
-                logits = model({worldTokenizer.encode("\n\nUser: "+input + "\n\nSystem:")});
+                logits = model({worldTokenizer.encode("\n\nuser: "+input + "\n\nassistant:")});
                 last = std::chrono::high_resolution_clock::now();
                 
             }else{

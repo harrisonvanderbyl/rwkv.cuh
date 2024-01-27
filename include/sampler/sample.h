@@ -37,7 +37,6 @@ def sample_logits(out, temperature=1.0, top_p=0.8):
 
 size_t typical(float* logits, double _temp = 1.0, double _tau = 0.9)
 {
-    softmax(logits);
     
     float* sorted_probs = new float[ALEN];
     std::copy(logits, logits+ALEN, sorted_probs);
@@ -64,36 +63,59 @@ size_t typical(float* logits, double _temp = 1.0, double _tau = 0.9)
             logits[i] = 0;
         }
     }
-    if (_temp != 1.0)
+
+    
+    float sum1 = 0.0;
+    for (size_t i = 0; i < ALEN; i++)
     {
-        for (size_t i = 0; i < ALEN; i++)
+        sum1 = std::max(logits[i], sum1);
+    }
+
+    for (size_t i = 0; i < ALEN; i++)
+    {
+        logits[i]/=sum1;
+    }
+    
+    float r = ((double)rand()) / ((double)RAND_MAX);
+    r = pow(r,_temp);
+    size_t out = 1;
+
+    struct prob{
+        float p;
+        size_t i;
+    };
+
+    std::vector<prob> probs;
+
+    for (size_t i = 0; i < ALEN; i++)
+    {
+        if (logits[i] > 0.01)
         {
-            logits[i] = pow(logits[i], 1.0/_temp);
+            prob p;
+            p.p = logits[i];
+            p.i = i;
+            probs.push_back(p);
         }
     }
-    float sum = 0;
-    for (size_t i = 0; i < ALEN; i++)
+
+    std::sort(probs.begin(), probs.end(), [](const prob& lhs, const prob& rhs) {
+        return lhs.p > rhs.p;
+    });
+
+
+    for (size_t i = 0; i < probs.size(); i++)
     {
-        sum += logits[i];
-    }
-    for (size_t i = 0; i < ALEN; i++)
-    {
-        logits[i] /= sum;
-    }
-    float r = (float)rand() / (float)RAND_MAX;
-    float cumulative = 0;
-    size_t out = 0;
-    for (size_t i = 0; i < ALEN; i++)
-    {
-        cumulative += logits[i];
-        if (cumulative > r)
+        if (probs[i].p > r)
         {
-            out = i;
+            out = probs[i].i;
             break;
         }
     }
+    
+    
     return out;
 };
+
 
 size_t dart(float* logits, double _temp = 1.0, double _tau = 0.6)
 {
