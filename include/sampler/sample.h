@@ -35,12 +35,16 @@ def sample_logits(out, temperature=1.0, top_p=0.8):
     out = np.random.choice(a=len(probs), p=probs)
     return out*/
 
-size_t typical(float* logits, double _temp = 1.0, double _tau = 0.9)
+size_t typical(float* logits, double _temp = 1.0, double _tau = 0.6)
 {
     
+    softmax(logits);
     float* sorted_probs = new float[ALEN];
     std::copy(logits, logits+ALEN, sorted_probs);
-    std::sort(sorted_probs, sorted_probs+ALEN, std::greater<float>());
+    // sort from smallest to largest
+    std::sort(sorted_probs, sorted_probs+ALEN, [](const float& lhs, const float& rhs) {
+        return lhs < rhs;
+    });
     float* cumulative_probs = new float[ALEN];
     cumulative_probs[0] = sorted_probs[0];
     for (size_t i = 1; i < ALEN; i++)
@@ -48,9 +52,10 @@ size_t typical(float* logits, double _temp = 1.0, double _tau = 0.9)
         cumulative_probs[i] = cumulative_probs[i-1] + sorted_probs[i];
     }
     float cutoff = sorted_probs[0];
+    auto tau = _tau*cumulative_probs[ALEN-1];
     for (size_t i = 0; i < ALEN; i++)
     {
-        if (cumulative_probs[i] > _tau)
+        if (cumulative_probs[i] > tau)
         {
             cutoff = sorted_probs[i];
             break;
@@ -71,19 +76,16 @@ size_t typical(float* logits, double _temp = 1.0, double _tau = 0.9)
         sum1 = std::max(logits[i], sum1);
     }
 
-    for (size_t i = 0; i < ALEN; i++)
-    {
-        logits[i]/=sum1;
-    }
-    
     float r = ((double)rand()) / ((double)RAND_MAX);
-    r = pow(r,_temp);
+    r = pow(r, 1.0/_temp) * sum1;
     size_t out = 1;
 
     struct prob{
         float p;
         size_t i;
     };
+
+
 
     std::vector<prob> probs;
 
@@ -98,8 +100,10 @@ size_t typical(float* logits, double _temp = 1.0, double _tau = 0.9)
         }
     }
 
+    // sort fom smallest to largest
+
     std::sort(probs.begin(), probs.end(), [](const prob& lhs, const prob& rhs) {
-        return lhs.p > rhs.p;
+        return lhs.p < rhs.p;
     });
 
 
