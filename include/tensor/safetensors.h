@@ -28,6 +28,7 @@ using json = nlohmann::json;
     public:
 
         std::unordered_map<std::string, const metadata_t> metas;
+
         
        
         const char* storage = nullptr;
@@ -71,16 +72,17 @@ using json = nlohmann::json;
 
         // contains key
         inline bool contains(const char* name) const {
-            auto keys = this->keys();
-            bool found = false;
+            // auto keys = this->keys();
+            // bool found = false;
 
-            for (auto key : keys){
-                if (strcmp(key, name) == 0){
-                    found = true;
-                }
+            // for (auto key : keys){
+            //     if (strcmp(key, name) == 0){
+            //         found = true;
+            //     }
 
-            }
-            return found;
+            // }
+            // return found;
+            return metas.find(name) != metas.end();
         }
         inline bool contains(std::string name) const {
             return contains(name.c_str());

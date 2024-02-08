@@ -35,7 +35,7 @@ def sample_logits(out, temperature=1.0, top_p=0.8):
     out = np.random.choice(a=len(probs), p=probs)
     return out*/
 
-size_t typical(float* logits, double _temp = 1.0, double _tau = 0.6)
+size_t typical(float* logits, double _temp = 1.33, double _tau = 0.0)
 {
     
     softmax(logits);
@@ -77,7 +77,7 @@ size_t typical(float* logits, double _temp = 1.0, double _tau = 0.6)
     }
 
     float r = ((double)rand()) / ((double)RAND_MAX);
-    r = pow(r, 1.0/_temp) * sum1;
+    r = pow(r, _temp) * sum1;
     size_t out = 1;
 
     struct prob{
