@@ -492,7 +492,6 @@ struct Tensor{
         }
     }
 
-    NEONBF16
     Tensor float32(){
         if (dtype == TENSORTYPE::kFLOAT_32){
             return *this;

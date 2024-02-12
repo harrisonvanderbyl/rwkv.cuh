@@ -151,7 +151,7 @@ AVXONLY(
 )
 ARMONLY(
 
-    __attribute__((target("bf16"))) void dopartialfp(MatMulJob job) {
+    void dopartialfp(MatMulJob job) {
         // do the work
 
         auto A = job.Ao;
