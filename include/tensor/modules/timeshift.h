@@ -18,7 +18,7 @@ class TimeShift
         }
 
         TimeShift(const size_t dimsi){
-            std::vector<size_t> state_size = {1, 1, dimsi};
+            std::vector<size_t> state_size = {16, 1, dimsi};
             // std::cout << "TimeShift:" << state_size[0] << std::endl;
             this->state = Tensor(state_size);
             
