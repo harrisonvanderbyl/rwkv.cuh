@@ -59,11 +59,11 @@ int main( int argc, char** argv ){
         path = argv[1];
     }
 
-    RWKV model(path);
+    RWKV model(path, 4);
 
     RWKVTokenizer worldTokenizer("rwkv_vocab_v20230424.txt");
     
-    std::string instruction = "\n\nsystem: Your role is assist the user in any way they ask \n\nuser: ";
+    std::string instruction = "\n\nSystem: Your role is assist the user in any way they ask \n\nUser: ";
     
     
     std::cout << instruction;
@@ -73,7 +73,7 @@ int main( int argc, char** argv ){
 
     std::cout << "\n";
 
-    auto tokens = worldTokenizer.encode(instruction + input+ "\n\n" + "assistant:");
+    auto tokens = worldTokenizer.encode(instruction + input+ "\n\n" + "Assistant:");
 
     if (argc > 2)
     {
@@ -95,7 +95,7 @@ int main( int argc, char** argv ){
         // std::cout << "Generating token " << i << std::endl;
         
         auto logs =(logits[0][logits.shape[1]-1]).cpu().float32();
-        size_t sample = typical((float*)logs.data, 2.0, 0.5);
+        size_t sample = dart((float*)logs.data, 0.9, 0.5);
      
 
 
@@ -109,7 +109,7 @@ int main( int argc, char** argv ){
 
             auto vnn = output;
             if (output == "\n\n"){
-                vnn += "user: ";
+                vnn += "User: ";
             }
             
             if (cout->count == wchain2.count){
