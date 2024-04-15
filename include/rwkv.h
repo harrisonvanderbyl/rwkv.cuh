@@ -107,6 +107,44 @@ public:
         }
     }
 
+    void expand_state(size_t batchsize){
+         for (size_t i = 0; i < layers; i++)
+        {
+            auto newattshape = blocks[i].att.state.shape;
+            size_t oldbatch = newattshape[0];
+            newattshape[0] = batchsize;
+            auto newattstate = new Tensor(newattshape);
+            for (size_t bb = 0; bb < oldbatch; bb++)
+            {
+                newattstate->copyfrom(blocks[i].att.state[bb]);
+            }
+            blocks[i].att.state.data = newattstate->data;
+            
+
+            
+            // blocks[i].att.timeshift.state[batchid].copyfrom(ts1);
+            auto newattshiftshape = blocks[i].att.timeshift.state.shape;
+            newattshiftshape[0] = batchsize;
+            auto newattshiftstate = new Tensor(newattshiftshape);
+            for (size_t bb = 0; bb < oldbatch; bb++)
+            {
+                newattshiftstate->copyfrom(blocks[i].att.timeshift.state[bb]);
+            }
+            blocks[i].att.timeshift.state.data = newattshiftstate->data;
+
+            auto newffnshiftshape = blocks[i].ffn.timeshift.state.shape;
+            newffnshiftshape[0] = batchsize;
+            auto newffnshiftstate = new Tensor(newffnshiftshape);
+            for (size_t bb = 0; bb < oldbatch; bb++)
+            {
+                newffnshiftstate->copyfrom(blocks[i].ffn.timeshift.state[bb]);
+            }
+            blocks[i].ffn.timeshift.state.data = newffnshiftstate->data;
+            // blocks[i].ffn.timeshift.state[batchid].copyfrom(ts2);
+            
+        }
+    }
+
     std::map<std::string, Tensor> new_state(size_t max_batch_size = 1){
         std::map<std::string, Tensor> state;
         for (size_t i = 0; i < layers; i++)

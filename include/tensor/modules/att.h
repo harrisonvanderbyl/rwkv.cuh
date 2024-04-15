@@ -42,7 +42,7 @@ class RWKV_5_ATT
 
             
             this->n_head = dims/this->head_size;
-            this->state = Tensor({1, this->n_head , this->head_size, this->head_size});
+            this->state = Tensor({16, this->n_head , this->head_size, this->head_size});
             
             this->time_decay = model[prefix + "time_decay"];
             this->time_faaaa = model[prefix + "time_faaaa"];
