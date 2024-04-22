@@ -96,10 +96,15 @@ int main( int argc, char** argv ){
         
         auto logs =(logits[0][logits.shape[1]-1]).cpu().float32();
         size_t sample = dart((float*)logs.data, 0.9, 0.5);
-     
+        std::string output = "";
+        if (sample == 0){
+            output = "\n\n";
+        }
+        else{
+            output = worldTokenizer.decode({sample});
+        }
 
-
-        std::string output = worldTokenizer.decode({sample});
+        
 
         auto t = std::chrono::high_resolution_clock::now();
 
