@@ -118,6 +118,7 @@ static inline const void simd_wkv(size_t size, size_t bhofseti, size_t bbhhofset
     auto rrrn = vdupq_n_f32(rrr);
     auto wwwn = vdupq_n_f32(www);
     auto kkkn = vdupq_n_f32(kkk);
+    auto uuun = vdupq_n_f32(uuu);
     for (size_t j = 0; j < size; j += get_simd_width())
     {
         size_t jind = bhofseti + j;
@@ -134,7 +135,7 @@ static inline const void simd_wkv(size_t size, size_t bhofseti, size_t bbhhofset
 
         // out[t,bb,hh,j] += r[t,bb,hh,i]*(s[bb,hh,i,j] + atu*u[hh,i] )
         // auto sssatuuuu = atu * uuu + sss;
-        auto sssaatuuu = vfmaq_f32(sss,atu,uuu);
+        auto sssaatuuu = vfmaq_f32(sss,atu,uuun);
 
         // flp(out)[jind] += outf;
         vst1q_f32(flp(out)+jind, vfmaq_f32(vld1q_f32(flp(out)+jind),sssaatuuu,rrrn));
