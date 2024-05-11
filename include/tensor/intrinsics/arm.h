@@ -105,9 +105,18 @@ static inline const float dot_uint8_floats(u_int8_t *input, float *other, size_t
 {
     auto zz1 = vdupq_n_f32(0);
 
-    for (auto k = 0; k < size; k+=get_simd_width())
+    for (auto k = 0; k < size; k+=get_simd_width()*2)
     {
-        zz1 = vaddq_f32(zz1, vmulq_f32(vcvtq_f32_u32(vmovl_u16(vld1_u16((uint16_t *)input + k))), vld1q_f32(other + k)));
+        auto u16vec = vmovl_u8(vld1_u8(input + k));
+        auto u32vec = vmovl_u16(vget_low_u16(u16vec));
+        auto f32vec = vcvtq_f32_u32(u32vec);
+        zz1 = vmlaq_f32(zz1, f32vec, vld1q_f32(other + k));
+
+        u32vec = vmovl_u16(vget_high_u16(u16vec));
+        f32vec = vcvtq_f32_u32(u32vec);
+
+        zz1 = vmlaq_f32(zz1, f32vec, vld1q_f32(other + k + get_simd_width()));
+;
     }
 
     return reduce_float(zz1);
@@ -135,13 +144,13 @@ static inline const void simd_wkv(size_t size, size_t bhofseti, size_t bbhhofset
 
         // out[t,bb,hh,j] += r[t,bb,hh,i]*(s[bb,hh,i,j] + atu*u[hh,i] )
         // auto sssatuuuu = atu * uuu + sss;
-        auto sssaatuuu = vfmaq_f32(sss,atu,uuun);
+        auto sssaatuuu = vmlaq_f32(sss,atu,uuun);
 
         // flp(out)[jind] += outf;
-        vst1q_f32(flp(out)+jind, vfmaq_f32(vld1q_f32(flp(out)+jind),sssaatuuu,rrrn));
+        vst1q_f32(flp(out)+jind, vmlaq_f32(vld1q_f32(flp(out)+jind),sssaatuuu,rrrn));
 
         // *(flp(ss) + sind) = sss * www + atu;
-        vst1q_f32(flp(ss)+sind, vfmaq_f32(atu,sss,wwwn));
+        vst1q_f32(flp(ss)+sind, vmlaq_f32(atu,sss,wwwn));
     }
 }
 
