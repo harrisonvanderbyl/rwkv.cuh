@@ -79,6 +79,8 @@
         "filesystem": "cpp",
         "queue": "cpp",
         "stack": "cpp",
-        "__mutex_base": "cpp"
+        "__mutex_base": "cpp",
+        "__hash_table": "cpp",
+        "__tree": "cpp"
     }
 }

@@ -113,4 +113,34 @@ static inline const float dot_uint8_floats(u_int8_t *input, float *other, size_t
     return reduce_float(zz1);
 }
 
+static inline const void simd_wkv(size_t size, size_t bhofseti, size_t bbhhofseti, void* vv, void* ss, float kkk, float uuu, float www, float rrr, void* out)
+{
+    auto rrrn = vdupq_n_f32(rrr);
+    auto wwwn = vdupq_n_f32(www);
+    for (size_t j = 0; j < size; j += get_simd_width())
+    {
+        size_t jind = bhofseti + j;
+        size_t sind = bbhhofseti + j;
+
+        // atu = k[t,bb,hh,i]*v[t,bb,hh,j]
+        // auto vvv = flp(vv)[jind];
+        auto vvv = vld1q_f32(flp(vv)+jind);
+
+        auto sss = vld1q_f32(flp(ss)+sind);
+
+        // multiply kkk and vvv
+        auto atu =  vmulq_f32(vvv , kkk);
+
+        // out[t,bb,hh,j] += r[t,bb,hh,i]*(s[bb,hh,i,j] + atu*u[hh,i] )
+        // auto sssatuuuu = atu * uuu + sss;
+        auto sssaatuuu = vfmaq_f32(sss,atu,uuu);
+
+        // flp(out)[jind] += outf;
+        vst1q_f32(flp(out)+jind, vfmaq_f32(vld1q_f32(flp(out)+jind),sssatuuuu,rrrn));
+
+        // *(flp(ss) + sind) = sss * www + atu;
+        vst1q_f32(flp(ss)+sind, vfmaq_f32(atu,sss,wwwn));
+    }
+}
+
 #endif
