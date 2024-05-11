@@ -6,64 +6,68 @@
 
 void normalize_cpu_kernel(void *input, void *weight, void *bias, void *output, float eps, size_t lastshape, size_t headshape, size_t size, TENSORTYPE dtype)
 {
-
+    auto threadpool = get_threadpool(1);
     size_t simdwidth = get_simd_width();
-    for (size_t i = 0; i < size; i += headshape)
+    size_t heads = lastshape / headshape;
+
+    size_t total_heads = size / headshape;
+    size_t newheadshape = lastshape / threadpool->heads;
+    if (headshape % newheadshape != 0 and newheadshape % headshape != 0)
     {
-
-        float mean = 0;
-        float var = 0;
-
-        if (dtype == TENSORTYPE::kFLOAT_32)
-        {
-
-            for (size_t j = i; j < i + headshape; j += simdwidth)
-            {
-                mean += simd_accumulate(flp(input) + j);
-            }
-            mean /= headshape;
-
-            for (size_t j = i; j < i + headshape; j += simdwidth)
-            {
-                var += simd_variance_acc(flp(input) + j, mean);
-            }
-
-            var /= headshape;
-
-            float vareps = sqrt(var + eps);
-
-            for (size_t j = i; j < i + headshape; j+= simdwidth)
-            {
-                simd_norm_assign(flp(input) + j, mean, vareps, flp(weight) + (j % lastshape), flp(bias) + (j % lastshape), flp(output) + j);
-            }
-        }
-        else if (dtype == TENSORTYPE::kBFLOAT_16)
-        {
-            for (size_t j = i; j < i + headshape; j += simdwidth * 2)
-            {
-                mean += simd_accumulate_bf16(bflp(input) + j);
-            }
-            mean /= headshape;
-
-            for (size_t j = i; j < i + headshape; j += simdwidth * 2)
-            {
-                var += simd_variance_acc_bf16(bflp(input) + j, mean);
-            }
-
-            var /= headshape;
-
-            float vareps = sqrt(var + eps);
-
-            for (size_t j = i; j < i + headshape; j += simdwidth * 2)
-            {
-                simd_norm_assign_bf16(bflp(input) + j, mean, vareps, bflp(weight) + j % lastshape, bflp(bias) + j % lastshape, bflp(output) + j);
-            }
-        }
-        else
-        {
-            throw std::runtime_error("Unsupported datatype for normalize, only float32 and bfloat16 are supported on CPU");
-        }
+        throw std::runtime_error("Headshape and threads must share common factor");
     }
+
+    threadpool->sync();
+
+    for (size_t oo = 0; oo < threadpool->heads; oo += 1)
+    {
+        threadpool->add_job(
+            [input, weight, bias, output, eps, lastshape, headshape, dtype, simdwidth, size, oo, newheadshape]
+            {
+                for (size_t ii = oo * newheadshape; ii < size; ii += lastshape)
+                {
+                    for (size_t i = ii; i < ii + newheadshape; i += headshape)
+                    {
+                        float mean = 0;
+                        float var = 0;
+
+                        size_t startOfActualHead = i - (i % headshape);
+
+                        if (dtype == TENSORTYPE::kFLOAT_32)
+                        {
+
+                            for (size_t j = startOfActualHead; j < startOfActualHead + headshape; j += simdwidth)
+                            {
+                                mean += simd_accumulate(flp(input) + j);
+                            }
+                            mean /= headshape;
+
+                            for (size_t j = startOfActualHead; j < startOfActualHead + headshape; j += simdwidth)
+                            {
+                                var += simd_variance_acc(flp(input) + j, mean);
+                            }
+
+                            var /= headshape;
+
+                            float vareps = sqrt(var + eps);
+
+                            for (size_t j = i; j < i + std::min(newheadshape,headshape); j += simdwidth)
+                            {
+                                simd_norm_assign(flp(input) + j, mean, vareps, flp(weight) + (j % lastshape), flp(bias) + (j % lastshape), flp(output) + j);
+                            }
+                        }
+                        else
+                        {
+                            throw std::runtime_error("Unsupported datatype for normalize, only float32 supported on CPU, dtype is " + get_dtype_name(dtype));
+                        }
+                    }
+                }
+            },
+            oo);
+    }
+
+    
+
 }
 
 #endif // NORMALIZE_CPU_H

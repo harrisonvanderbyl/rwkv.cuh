@@ -5,22 +5,33 @@
 #include "tensor/intrinsics/intrinsics.h"
 
 
-void swishmul_cpu_kernel(void* input, void* other, void* output, size_t size, TENSORTYPE dtype){
+void swishmul_cpu_kernel(void* input, void* other, void* output, size_t size, TENSORTYPE dtype,size_t dims){
 
     size_t simdwidth = get_simd_width();
 
-    if (dtype == TENSORTYPE::kFLOAT_32){    
-        for (size_t i = 0; i < size; i+=simdwidth){
-            simd_swishmul(flp(input) + i, flp(other) + i, flp(output) + i);
+    
+    auto pool = get_threadpool();
+
+    auto headsize = dims/pool->heads;
+
+    if (dtype == TENSORTYPE::kFLOAT_32){   
+
+        for (size_t t = 0; t < pool->heads; t++){
+            pool->add_job([input, other, output, size, dims, simdwidth, t, headsize]
+            {
+                for (size_t ii = t*headsize; ii < size; ii+=dims){
+                    for (size_t i = ii; i < ii + headsize; i+=simdwidth){
+                        simd_swishmul(flp(input) + i, flp(other) + i, flp(output) + i);
+                    }
+                }
+            },t);
         }
+        
+
     }
-    else if (dtype == TENSORTYPE::kBFLOAT_16){ 
-        for (size_t i = 0; i < size; i+=simdwidth*2){
-            simd_swishmul_bf16(bflp(input) + i, bflp(other) + i, bflp(output) + i);
-        }
-    }
+    
     else{
-        throw std::runtime_error("swishmul only implemented for float and bfloat16");
+        throw std::runtime_error("swishmul only implemented for float");
     }
 }
 

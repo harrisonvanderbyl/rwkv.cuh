@@ -15,7 +15,7 @@ inline Tensor Tensor::operator[](const size_t index) {
     return out;
 }
 
-inline Tensor Tensor::gather(std::vector<std::vector<size_t>> indices, Tensor out) {
+inline Tensor Tensor::gather(std::vector<std::vector<size_t>> indices, Tensor out = Tensor()) {
     
     if (out.data == nullptr) {
         out = Tensor({indices.size(), indices[0].size(), shape[1]}, dtype, out.device, device_id);

@@ -4,24 +4,34 @@
 
 #include "tensor/intrinsics/intrinsics.h"
 
-
-void sigmoidmul_cpu_kernel(void* input, void* other, void* residual, void* output, size_t size, TENSORTYPE dtype){
+void sigmoidmul_cpu_kernel(void *input, void *other, void *residual, void *output, size_t size, TENSORTYPE dtype, size_t dims)
+{
 
     size_t simdwidth = get_simd_width();
 
-    if (dtype == TENSORTYPE::kFLOAT_32){    
-        for (size_t i = 0; i < size; i+=simdwidth){
-            simd_sigmoidmul(flp(input) + i, flp(other) + i, flp(residual) + i, flp(output) + i);
+    auto pool = get_threadpool();
+
+    auto headsize = dims / pool->heads;
+
+    if (dtype == TENSORTYPE::kFLOAT_32)
+    {
+
+        for (size_t t = 0; t < pool->heads; t++)
+        {
+            pool->add_job([input, output, size, dims, simdwidth, t, headsize, other, residual]
+                          {
+                for (size_t ii = t * headsize; ii < size; ii += dims)
+                {
+                    for (size_t i = ii; i < ii + headsize; i += simdwidth)
+                    {
+            simd_sigmoidmul(flp(input) + i, flp(other) + i, flp(residual) + i, flp(output) + i);}
+                } }, t);
         }
     }
-    else if (dtype == TENSORTYPE::kBFLOAT_16){ 
-        for (size_t i = 0; i < size; i+=simdwidth*2){
-            simd_sigmoidmul_bf16(bflp(input) + i, bflp(other) + i, bflp(residual) + i, bflp(output) + i);
-        }
-    }
-    else{
-        throw std::runtime_error("sigmoidmul only implemented for float and bfloat16");
+    else
+    {
+        throw std::runtime_error("sigmoidmul only implemented for float");
     }
 }
 
-#endif //SIGMOIDMUL_NAIVE_H
+#endif // SIGMOIDMUL_NAIVE_H

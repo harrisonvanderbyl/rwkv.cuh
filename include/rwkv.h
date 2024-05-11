@@ -7,8 +7,6 @@
 #include "tensor/modules/linear.h"
 #include "tensor/modules/block.h"
 
-void startWorkers(size_t numWorkers = 8);
-
 class RWKV
 {
 
@@ -28,6 +26,9 @@ public:
         std::ifstream inFile;
         inFile.open(path, std::ios::binary);
         model = safetensors(inFile);
+
+        auto pool = get_threadpool(threadsNum);
+        pool->start();
         
 
         auto keys = model.keys();
@@ -36,7 +37,7 @@ public:
         {
             if (std::string(key).find("blocks.") != std::string::npos)
             {
-                if (std::string(key).find("att.time_mix_k") != std::string::npos)
+                if (std::string(key).find("ln1.weight") != std::string::npos)
                 {
                     layers++;
                 }
@@ -53,24 +54,30 @@ public:
         this->output = Linear(model, "head");
         for (size_t i = 0; i < layers; i++)
         {
+            // std::cout << "Block" << i << std::endl;
             blocks.push_back(Block(model, i));
         }
 
-        startWorkers(threadsNum);
     }
 
     Tensor operator()(std::vector<std::vector<size_t>> input)
     {
         auto x = emb1(input);
         x = ln0(x);
+        
 
         for (size_t i = 0; i < layers; i++)
         {
             x = blocks[i](x);
-
         }
         auto xm = ln_out(x);
-        return output(xm);
+        
+        auto pool = get_threadpool(); 
+        pool->sync();
+        auto out = output(xm);
+
+        pool->sync();
+        return out;
 
     }
 
@@ -80,12 +87,12 @@ public:
         for (size_t i = 0; i < layers; i++)
         {
             auto wkv = blocks[i].att.state[batchid];
-            auto ts1 = blocks[i].att.timeshift.state[batchid];
-            auto ts2 = blocks[i].ffn.timeshift.state[batchid];
+            auto ts1 = blocks[i].attshift.state[batchid];
+            auto ts2 = blocks[i].ffnshift.state[batchid];
           
             state["blocks." + std::to_string(i) + ".att.state"].copyfrom(wkv);
-            state["blocks." + std::to_string(i) + ".att.timeshift.state"].copyfrom(ts1);
-            state["blocks." + std::to_string(i) + ".ffn.timeshift.state"].copyfrom(ts2);
+            state["blocks." + std::to_string(i) + ".attshift.state"].copyfrom(ts1);
+            state["blocks." + std::to_string(i) + ".ffnshift.state"].copyfrom(ts2);
             
         }
     }
@@ -94,15 +101,15 @@ public:
         for (size_t i = 0; i < layers; i++)
         {
             auto wkv = state["blocks." + std::to_string(i) + ".att.state"];
-            auto ts1 = state["blocks." + std::to_string(i) + ".att.timeshift.state"];
-            auto ts2 = state["blocks." + std::to_string(i) + ".ffn.timeshift.state"];
+            auto ts1 = state["blocks." + std::to_string(i) + ".attshift.state"];
+            auto ts2 = state["blocks." + std::to_string(i) + ".ffnshift.state"];
 
             // std::cout << "wkv:" << wkv.shape[0] << " : " << wkv.shape[1] << std::endl;
             // std::cout << "ts1:" << ts1.shape[0] << " : " << ts1.shape[1] << std::endl;
             // std::cout << "ts2:" << ts2.shape[0] << " : " << ts2.shape[1] << std::endl;
             blocks[i].att.state[batchid].copyfrom(wkv);
-            blocks[i].att.timeshift.state[batchid].copyfrom(ts1);
-            blocks[i].ffn.timeshift.state[batchid].copyfrom(ts2);
+            blocks[i].attshift.state[batchid].copyfrom(ts1);
+            blocks[i].ffnshift.state[batchid].copyfrom(ts2);
             
         }
     }
@@ -122,25 +129,25 @@ public:
             
 
             
-            // blocks[i].att.timeshift.state[batchid].copyfrom(ts1);
-            auto newattshiftshape = blocks[i].att.timeshift.state.shape;
+            // blocks[i].attshift.state[batchid].copyfrom(ts1);
+            auto newattshiftshape = blocks[i].attshift.state.shape;
             newattshiftshape[0] = batchsize;
             auto newattshiftstate = new Tensor(newattshiftshape);
             for (size_t bb = 0; bb < oldbatch; bb++)
             {
-                newattshiftstate->copyfrom(blocks[i].att.timeshift.state[bb]);
+                newattshiftstate->copyfrom(blocks[i].attshift.state[bb]);
             }
-            blocks[i].att.timeshift.state.data = newattshiftstate->data;
+            blocks[i].attshift.state.data = newattshiftstate->data;
 
-            auto newffnshiftshape = blocks[i].ffn.timeshift.state.shape;
+            auto newffnshiftshape = blocks[i].ffnshift.state.shape;
             newffnshiftshape[0] = batchsize;
             auto newffnshiftstate = new Tensor(newffnshiftshape);
             for (size_t bb = 0; bb < oldbatch; bb++)
             {
-                newffnshiftstate->copyfrom(blocks[i].ffn.timeshift.state[bb]);
+                newffnshiftstate->copyfrom(blocks[i].ffnshift.state[bb]);
             }
-            blocks[i].ffn.timeshift.state.data = newffnshiftstate->data;
-            // blocks[i].ffn.timeshift.state[batchid].copyfrom(ts2);
+            blocks[i].ffnshift.state.data = newffnshiftstate->data;
+            // blocks[i].ffnshift.state[batchid].copyfrom(ts2);
             
         }
     }
@@ -150,12 +157,12 @@ public:
         for (size_t i = 0; i < layers; i++)
         {
             auto wkv = blocks[i].att.state[0];
-            auto ts1 = blocks[i].att.timeshift.state[0];
-            auto ts2 = blocks[i].ffn.timeshift.state[0];                      
+            auto ts1 = blocks[i].attshift.state[0];
+            auto ts2 = blocks[i].ffnshift.state[0];                      
           
             state["blocks." + std::to_string(i) + ".att.state"] = Tensor(wkv.shape, wkv.dtype, wkv.device, wkv.device_id);
-            state["blocks." + std::to_string(i) + ".att.timeshift.state"] = Tensor(ts1.shape, ts1.dtype, ts1.device, ts1.device_id);
-            state["blocks." + std::to_string(i) + ".ffn.timeshift.state"] = Tensor(ts2.shape, ts2.dtype, ts2.device, ts2.device_id);
+            state["blocks." + std::to_string(i) + ".attshift.state"] = Tensor(ts1.shape, ts1.dtype, ts1.device, ts1.device_id);
+            state["blocks." + std::to_string(i) + ".ffnshift.state"] = Tensor(ts2.shape, ts2.dtype, ts2.device, ts2.device_id);
             
         }
         return state;
@@ -178,21 +185,15 @@ public:
             blocks[i].att.receptance.cuda();
             blocks[i].att.output.cuda();
             blocks[i].att.ln_x.cuda();
-            blocks[i].att.timeshift.cuda();
+            blocks[i].attshift.cuda();
+            blocks[i].ffnshift.cuda();
             blocks[i].att.time_decay = blocks[i].att.time_decay.cuda();
             blocks[i].att.time_faaaa = blocks[i].att.time_faaaa.cuda();
-            blocks[i].att.time_mix_g = blocks[i].att.time_mix_g.cuda();
-            blocks[i].att.time_mix_k = blocks[i].att.time_mix_k.cuda();
-            blocks[i].att.time_mix_r = blocks[i].att.time_mix_r.cuda();
-            blocks[i].att.time_mix_v = blocks[i].att.time_mix_v.cuda();
             blocks[i].att.state = blocks[i].att.state.cuda();
 
             blocks[i].ffn.key.cuda();
             blocks[i].ffn.value.cuda();
             blocks[i].ffn.receptance.cuda();
-            blocks[i].ffn.timeshift.cuda();
-            blocks[i].ffn.time_mix_k = blocks[i].ffn.time_mix_k.cuda();
-            blocks[i].ffn.time_mix_r = blocks[i].ffn.time_mix_r.cuda();
   
         }
         

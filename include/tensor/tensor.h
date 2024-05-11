@@ -3,6 +3,7 @@
 #define TENSOR_TENSOR_H
 #include <iostream>
 #include "nlohmann/json.hpp"
+#include "tensor/operators/threading/threading.h"
 #if defined(__ARM_NEON)
 #define ARMONLY(x) x
 #define AVXONLY(x)
@@ -523,7 +524,7 @@ struct Tensor{
     Tensor swishmul(Tensor& other);
     Tensor matmul(Tensor& other, Tensor residual = Tensor());
     Tensor matmul(Tensor &Art, Tensor &Aot, Tensor &Bt, Tensor residual = Tensor());
-    Tensor normalize(Tensor& weight, Tensor& bias, Tensor& result, size_t heads = 1, float epsilon=1e-5);
+    Tensor normalize(const Tensor& weight, const Tensor& bias, const Tensor& result, size_t heads = 1, float epsilon=1e-5);
     
     Tensor wkv5(Tensor& r, Tensor& k, Tensor& v, Tensor& w, Tensor& u, Tensor& y);
 

@@ -16,7 +16,7 @@
             "cStandard": "c17",
             "cppStandard": "c++17",
             "intelliSenseMode": "linux-clang-x64"
-        }
+        },
         // cuh files
         // {
         //     "name": "Linux-cuda",
@@ -35,6 +35,22 @@
         //     "intelliSenseMode": "linux-clang-x64",
             
         // }
+        // arm.h
+        {
+            "name": "Linux-arm",
+            "includePath": [
+                "${workspaceFolder}/**"
+            ],
+            "defines": [],
+            "compilerPath": "/usr/bin/clang++-17",
+            "compilerArgs": [
+                "-march=native"
+            ],
+            "cStandard": "c17",
+            "cppStandard": "c++17",
+            "intelliSenseMode": "linux-clang-x64"
+        }
+
     ],
     "version": 4
 }

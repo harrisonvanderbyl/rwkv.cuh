@@ -15,14 +15,6 @@ void lerp_cpu_kernel(void *w, void *A, void *B, void *output, size_t size, size_
             simd_lerp(flp(A) + i, flp(B) + i, weight, flp(output) + i);
         }
     }
-    else if (dtype == TENSORTYPE::kBFLOAT_16)
-    {
-        for (size_t i = 0; i < size; i+=simdwidth*2)
-        {
-            bfloat16* weight = bflp(w) + i % loopsize;
-            simd_lerp_bf16(bflp(A) + i, bflp(B) + i, weight, bflp(output) + i);
-        }
-    }
     else
     {
         throw std::runtime_error("Not implemented for this dtype");

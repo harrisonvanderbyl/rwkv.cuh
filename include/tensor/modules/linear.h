@@ -11,7 +11,7 @@ class Linear
         Tensor offset;
         Tensor buffer = Tensor();
         bool quantized = false;
-        
+        bool splitHorizontal = true;
         Linear(){
             
         }
@@ -37,17 +37,16 @@ class Linear
             this->quantized = other.quantized;
             this->buffer = other.buffer;
 
-            
         }
         
         // default copy assignment operator
         Linear& operator=(const Linear& other) = default;
     
         
-        Tensor operator()(Tensor& input) {
+        Tensor operator()(Tensor input) {
 
             if(buffer.data == nullptr || buffer.shape[0] * buffer.shape[1] < input.shape[0] * input.shape[1] || buffer.dtype != input.dtype || buffer.device != input.device){
-                buffer = Tensor({input.shape[0],input.shape[1], weight.shape[0]}, input.dtype, input.device);
+                buffer = Tensor({input.shape[0],input.shape[1], (weight.shape[0])}, input.dtype, input.device);
             }
             buffer.empty();
 
@@ -59,8 +58,9 @@ class Linear
             }  
         }
 
-        Tensor operator()(Tensor& input, Tensor& residual) {
-
+        Tensor operator()(Tensor input, Tensor residual) {
+          
+            
             if (this->quantized){
                 return this->weight.matmul(this->range, this->offset, input, residual);
             }else{

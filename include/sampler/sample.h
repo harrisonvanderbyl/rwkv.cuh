@@ -126,10 +126,10 @@ size_t dart(float* logits, double _temp = 1.0, double _tau = 0.6)
     softmax(logits);
     double max = double(*std::max_element(logits, logits+ALEN));
     double min = double(*std::min_element(logits, logits+ALEN));
-    auto topp = 1.0 - _tau;
+    auto topp = _tau;
     auto dart = double(rand()) / RAND_MAX;
     dart = pow(dart, _temp);
-    dart = topp * dart + (1 - topp) * 1.0;
+    min = min + (max - min) * (1.0-topp);
     dart = min * (1 - dart) + max * dart;
     
     auto out = std::min_element(logits, logits+ALEN, [dart](const float& lhs, const float& rhs) {

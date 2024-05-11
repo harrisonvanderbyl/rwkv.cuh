@@ -8,9 +8,9 @@ void normalize_cpu_kernel(void* input, void* weight, void* bias, void* output, f
 // layernorm kernel
 
 
-inline Tensor Tensor::normalize(Tensor& weight, Tensor& bias, Tensor& result, size_t heads, float eps)
+inline Tensor Tensor::normalize(const Tensor& weight, const Tensor& bias, const Tensor& result, const size_t heads, float eps)
 {
-
+    assert(data != result.data);
     auto lastshape = this->shape.back();
     auto headshape = lastshape / heads;
 
