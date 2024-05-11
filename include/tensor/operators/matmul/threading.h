@@ -7,7 +7,6 @@
 
 #include "tensor/tensor.h"
 #include "tensor/operators/matmul/cpu.h"
-#include "immintrin.h"
 
 void matmul8_cpu_kernal(uint8_t *A, void *B, void *C, void *Ao, void *Ar, size_t BBT, size_t INSHAPE, size_t OUTSHAPE)
 {
