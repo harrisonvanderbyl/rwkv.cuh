@@ -22,14 +22,13 @@ public:
     size_t layers;
     size_t max_batch_seq = 0;
 
-    RWKV(std::string path, size_t threadsNum = 8, bool debug = false)
+    RWKV(std::string path, size_t threadsNum = 0, bool debug = false)
     {
         std::ifstream inFile;
         inFile.open(path, std::ios::binary);
         model = safetensors(inFile);
 
-        auto pool = get_threadpool(threadsNum, debug);
-        pool->start();
+        
         
 
         auto keys = model.keys();
@@ -45,6 +44,9 @@ public:
                
             }
         }
+        
+        auto pool = get_threadpool(threadsNum, debug);
+        pool->start();
 
         // std::cout << "layers:" << layers << std::endl;
 

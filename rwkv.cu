@@ -47,7 +47,7 @@ void run(RWKV* model,Tensor logitsin)
         std::string input = "";
         std::getline(std::cin, input);
         std::cout << "\n";
-        auto logits = model->operator()({worldTokenizer.encode("User: " + input + "\n\n")});
+        auto logits = model->operator()({worldTokenizer.encode("User: " + input + "\n\nAssistant:")});
         pool->add_job(
             [logits, model]()
             {
@@ -85,7 +85,7 @@ int main(int argc, char **argv)
 
     RWKV model(path, threads);
 
-    std::string instruction = "User: ";
+    std::string instruction = "System: You are a multi-lingual language model created by recursalAI and the RWKV group. Help the user with their tasks.\n\nUser: ";
 
     std::cout << instruction;
 
