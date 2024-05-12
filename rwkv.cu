@@ -22,7 +22,7 @@ void run(RWKV* model,Tensor logitsin)
     std::string output = "";
     if (sample == 0)
     {
-        output = "user";
+        output = "User";
         std::cout << "Error:0";
     }
     else
@@ -33,7 +33,7 @@ void run(RWKV* model,Tensor logitsin)
     // lock cout
 
     auto vnn = output;
-    if (output == "user")
+    if (output == "User")
     {
         vnn += ": ";
     }
@@ -42,12 +42,12 @@ void run(RWKV* model,Tensor logitsin)
     // flush cout
     std::cout << std::flush;
 
-    if (output == "user")
+    if (output == "User")
     {
         std::string input = "";
         std::getline(std::cin, input);
         std::cout << "\n";
-        auto logits = model->operator()({worldTokenizer.encode("user: " + input + "\n\n")});
+        auto logits = model->operator()({worldTokenizer.encode("User: " + input + "\n\n")});
         pool->add_job(
             [logits, model]()
             {
@@ -85,7 +85,7 @@ int main(int argc, char **argv)
 
     RWKV model(path, threads);
 
-    std::string instruction = "user: ";
+    std::string instruction = "User: ";
 
     std::cout << instruction;
 
@@ -94,7 +94,7 @@ int main(int argc, char **argv)
 
     std::cout << "\n";
 
-    auto tokens = worldTokenizer.encode(instruction + input + "\n\n" + "assistant:");
+    auto tokens = worldTokenizer.encode(instruction + input + "\n\n" + "Assistant:");
 
     // model.cuda();
     auto logitsstart = model({tokens});
