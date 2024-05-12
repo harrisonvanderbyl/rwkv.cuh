@@ -13,42 +13,40 @@ void Quantize(torch::Tensor &At, torch::Tensor &Art, torch::Tensor &Aot, torch::
     int64_t i, j;
     for (i = 0; i < M; i++)
     {
-        float amax = (-1e9);
-        float amin = (1e9);
+        double amax = (-1e9);
+        double amin = (1e9);
         for (j = 0; j < N; j += 1)
         {
-            float a = *(A + i * N + j);
+            double a = *(A + i * N + j);
             amax = std::max(amax, a);
             amin = std::min(amin, a);
         }
-        float max = (amax);
-        float min = (amin);
-        float range = (max - min);
+        double max = (amax);
+        double min = (amin);
+        double range = (max - min);
         uint BITS = 255;
-        float scale = (range/BITS);
+        double scale = (range/BITS);
         *(Ar + i)= scale;
         *(Ao + i)= min;
 
-        float diff = 0.0;
+        // float diff = 0.0;
         for (j = 0; j < N; j += 1)
         {
-            float a = *(A + i * N + j);
+            double a = *(A + i * N + j);
 
-            float d = ((a - (min))/(scale));
-
-            diff += (d - float((int)(d)));
+            double d = ((a - (min))/(scale));
             
                 // std::cout << d[k] << ":" << int64_t(d[k]) << ":" << int((uint8_t)(int(d[k]))) << ":" << int((uint8_t)((unsigned int)(d[k]))) << std::endl;
             Aq[i * N + j] = (u_int8_t)((u_int32_t)(d));
             
         }
 
-        if (addResiduals){
-            diff = diff / N;
-            auto offset = (diff * scale);
-            *(Ao + i) = *(Ao + i) + offset;
+        // if (addResiduals){
+        //     diff = diff / N;
+        //     auto offset = (diff * scale);
+        //     *(Ao + i) = *(Ao + i) + offset;
             
-        }
+        // }
     }
 }
 

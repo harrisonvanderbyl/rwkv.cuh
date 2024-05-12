@@ -135,36 +135,31 @@ static inline const float dot_floats(float *input, float *other, size_t size)
     return reduce_float(zz1);
 }
 
-static inline const void simd_wkv(size_t size, size_t bhofseti, size_t bbhhofseti, void* vv, void* ss, float kkk, float uuu, float www, float rrr, void* out)
+static inline const void simd_wkv(size_t B, size_t T,size_t H,size_t Z, size_t bb,size_t tt, size_t hh, float *vv, float *ss, float *kk, float *uu, float *ww, float *rr, float *yy)
 {
-    auto rrrn = vdupq_n_f32(rrr);
-    auto wwwn = vdupq_n_f32(www);
-    auto kkkn = vdupq_n_f32(kkk);
-    auto uuun = vdupq_n_f32(uuu);
-    for (size_t j = 0; j < size; j += get_simd_width())
+    auto k = kk + bb*T*H*Z + tt*H*Z + hh*Z;
+    auto v = vv + bb*T*H*Z + tt*H*Z + hh*Z;
+    auto r = rr + bb*T*H*Z + tt*H*Z + hh*Z;
+    auto y = yy + bb*T*H*Z + tt*H*Z + hh*Z;
+    auto s = ss + bb*H*Z*Z + hh*Z*Z;
+    auto u = uu + hh*Z;
+    auto w = ww + hh*Z;
+
+    for (size_t i = 0; i < Z; i++)
     {
-        size_t jind = bhofseti + j;
-        size_t sind = bbhhofseti + j;
+        auto acc = vdupq_n_f32(0);
+        for (size_t j = 0; j < Z; j+=get_simd_width())
+        {
+            auto kv = vmulq_f32(vld1q_f32(k+j), vld1q_f32(v+i));
+            auto sss = vld1q_f32(s+i*Z+j);
+            acc = vmlaq_f32(acc, vmlaq_f32(kv,vld1q_f32(u+j) , sss),vld1q_f32(r+j));
+            vst1q_f32(s+i*Z+j, vmlaq_f32(sss,vld1q_f32(w+j),kv));
 
-        // atu = k[t,bb,hh,i]*v[t,bb,hh,j]
-        // auto vvv = flp(vv)[jind];
-        auto vvv = vld1q_f32(flp(vv)+jind);
+        }
 
-        auto sss = vld1q_f32(flp(ss)+sind);
-
-        // multiply kkk and vvv
-        auto atu =  vmulq_f32(vvv , kkkn);
-
-        // out[t,bb,hh,j] += r[t,bb,hh,i]*(s[bb,hh,i,j] + atu*u[hh,i] )
-        // auto sssatuuuu = atu * uuu + sss;
-        auto sssaatuuu = vmlaq_f32(sss,atu,uuun);
-
-        // flp(out)[jind] += outf;
-        vst1q_f32(flp(out)+jind, vmlaq_f32(vld1q_f32(flp(out)+jind),sssaatuuu,rrrn));
-
-        // *(flp(ss) + sind) = sss * www + atu;
-        vst1q_f32(flp(ss)+sind, vmlaq_f32(atu,sss,wwwn));
+        y[i] = reduce_float(acc);
     }
 }
+
 
 #endif

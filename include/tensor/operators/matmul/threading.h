@@ -40,7 +40,7 @@ void matmul8_cpu_kernal(uint8_t *A, void *B, void *C, void *Ao, void *Ar, size_t
 
 void matmul_cpu_kernal(void *A, void *B, void *C, size_t BBT, size_t INSHAPE, size_t OUTSHAPE, TENSORTYPE dtype)
 {
-        ThreadPool *pool = get_threadpool();
+    ThreadPool *pool = get_threadpool();
 
     auto headsize = OUTSHAPE / pool->heads;
     for (size_t head = 0; head < pool->heads; head++)
@@ -67,55 +67,29 @@ void matmul_cpu_kernal(void *A, void *B, void *C, size_t BBT, size_t INSHAPE, si
 void wkv5_cpu_kernel(void *kk, void *vv, void *ww, void *uu, void *rr, void *ss, void *out, size_t T, size_t B, size_t C, size_t H, TENSORTYPE dtype)
 {
 
-    auto CH = C / H;
-
-    uint32_t bsize = H * T * CH;
-
-    // 1d tensor
-    uint32_t tsize = H * CH;
-    // 2d tensor
-    uint32_t ttsize = H * CH * CH;
-
-    // 1d
-    uint32_t hsize = CH;
-    // 2d
-    uint32_t hhsize = CH * CH;
-
     ThreadPool *pool = get_threadpool();
 
-    // size_t simdwidth = get_simd_width();
-    for (uint32_t hh = 0; hh < H; hh++)
+    size_t headsize = H / pool->heads;
+
+    for (uint32_t pid = 0; pid < pool->heads; pid++)
     {
-        pool->add_job([kk, vv, ww, uu, rr, ss, out, T, B, C, H, CH, bsize, tsize, ttsize, hsize, hhsize, hh, dtype]
+        pool->add_job([vv, ss, kk, uu, ww, rr, out, T, B, C, H, headsize, pid]
                       {
-            for (uint32_t bb = 0; bb < B; bb++)
+            for (size_t head = pid * headsize; head < (pid + 1) * headsize; head++)
             {
-                for (uint32_t t = 0; t < T; t++)
+                
+                for (uint32_t bb = 0; bb < B; bb++)
                 {
-                    for (uint32_t i = 0; i < CH; i++)
-                    {
-                        auto btimeoffset = bb * bsize;
-                        auto timeoffset = btimeoffset + t * tsize;
-                        auto bbhsize = bb * ttsize;
-
-                        auto hoffset = hh * hsize;
-                        auto bhofseti = timeoffset + hoffset;
-                        auto bbhhsize = bbhsize + hh * hhsize;
-
-                        uint32_t iind = bhofseti + i;
-                        auto hoffseti = hoffset + i;
-                        auto bbhhofseti = bbhhsize + i * hsize;
-
-                        float kkk = flp(kk)[iind];
-                        float uuu = flp(uu)[hoffseti];
-                        float rrr = flp(rr)[iind];
-                        float www = flp(ww)[hoffseti];
+                    for (uint32_t t = 0; t < T; t++)
+                    { 
                         
-                       simd_wkv(CH, bhofseti, bbhhofseti, vv, ss, kkk, uuu, www, rrr, out);
+                                                
+                        simd_wkv(B,T,H,C/H, bb, t, head, flp(vv), flp(ss), flp(kk), flp(uu), flp(ww), flp(rr), flp(out));
+                            
                         
                     }
                 }
-            } }, hh);
+            } }, pid);
     }
 }
 

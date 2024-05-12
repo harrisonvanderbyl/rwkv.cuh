@@ -98,32 +98,29 @@ static inline const float dot_floats(float *input, float *other, size_t size)
     return reduce_float(zz1);
 }
 
-static inline const void simd_wkv(size_t size, size_t bhofseti, size_t bbhhofseti, void* vv, void* ss, float kkk, float uuu, float www, float rrr, void* out)
+static inline const void simd_wkv(size_t B, size_t T,size_t H,size_t Z, size_t bb,size_t tt, size_t hh, float *vv, float *ss, float *kk, float *uu, float *ww, float *rr, float *yy)
 {
-    auto rrrn = _mm256_set1_ps(rrr);
-    auto wwwn = _mm256_set1_ps(www);
-    for (size_t j = 0; j < size; j += get_simd_width())
+    auto k = kk + bb*T*H*Z + tt*H*Z + hh*Z;
+    auto v = vv + bb*T*H*Z + tt*H*Z + hh*Z;
+    auto r = rr + bb*T*H*Z + tt*H*Z + hh*Z;
+    auto y = yy + bb*T*H*Z + tt*H*Z + hh*Z;
+    auto s = ss + bb*H*Z*Z + hh*Z*Z;
+    auto u = uu + hh*Z;
+    auto w = ww + hh*Z;
+
+    for (size_t i = 0; i < Z; i++)
     {
-        size_t jind = bhofseti + j;
-        size_t sind = bbhhofseti + j;
+        auto acc = _mm256_setzero_ps();
+        for (size_t j = 0; j < Z; j+=8)
+        {
+            auto kv = _mm256_loadu_ps(k+j) * v[i];
+            auto sss = _mm256_loadu_ps(s+i*Z+j);
+            acc = _mm256_fmadd_ps(_mm256_fmadd_ps(kv,_mm256_loadu_ps(u+j) , sss),_mm256_loadu_ps(r+j),acc);
+            _mm256_store_ps(s+i*Z+j, _mm256_fmadd_ps(sss,_mm256_loadu_ps(w+j),kv));
 
-        // atu = k[t,bb,hh,i]*v[t,bb,hh,j]
-        // auto vvv = flp(vv)[jind];
-        auto vvv = _mm256_loadu_ps(flp(vv)+jind);
+        }
 
-        auto sss = _mm256_loadu_ps(flp(ss)+sind);
-
-        // multiply kkk and vvv
-        auto atu = vvv * kkk;
-
-        // out[t,bb,hh,j] += r[t,bb,hh,i]*(s[bb,hh,i,j] + atu*u[hh,i] )
-        auto sssatuuuu = atu * uuu + sss;
-
-        // flp(out)[jind] += outf;
-        _mm256_storeu_ps(flp(out)+jind, _mm256_fmadd_ps(sssatuuuu,rrrn,_mm256_load_ps(flp(out)+jind)));
-
-        // *(flp(ss) + sind) = sss * www + atu;
-        _mm256_storeu_ps(flp(ss)+sind, _mm256_fmadd_ps(sss,wwwn,atu));
+        y[i] = reduce_float(acc);
     }
 }
 #endif

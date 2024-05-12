@@ -31,11 +31,15 @@ int main( int argc, char** argv ){
     }
 
     RWKV model(path, threads, true);
+    auto pool = get_threadpool();
 
     // model.cuda();
     auto logits = model({{0}});
 
-    auto pool = get_threadpool();
+    pool->debug(model.blocks[0].attshift.state[0], "attshift state");
+    pool->debug(model.blocks[0].ffnshift.state[0], "ffnshift state");
+    pool->debug(model.blocks[0].att.state[0], "att state");
+
 
     pool->start();
 

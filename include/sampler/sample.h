@@ -129,7 +129,7 @@ size_t dart(float* logits, double _temp = 1.0, double _tau = 0.6)
     min = min + (max - min) * (1.0-topp);
     dart = min * (1 - dart) + max * dart;
     
-    auto out = std::min_element(logits+1, logits+ALEN, [dart](const float& lhs, const float& rhs) {
+    auto out = std::min_element(logits, logits+ALEN, [dart](const float& lhs, const float& rhs) {
         return std::abs(lhs - dart) < std::abs(rhs - dart);
     });
 
