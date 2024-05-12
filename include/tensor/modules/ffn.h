@@ -23,7 +23,7 @@ class FeedForward
             this->key = Linear(model, prefix + "key");
             this->value = Linear(model, prefix + "value");
         }
-        Tensor operator()(Tensor input, Tensor residual){
+        void operator()(Tensor input, Tensor residual, Tensor output){
 
             auto pool = get_threadpool();
             
@@ -36,8 +36,7 @@ class FeedForward
             pool->sync();
             auto v = this->value(krs); 
             
-            auto out = r.sigmoidmul(v, residual);
-            return out;
+            r.sigmoidmul(v, residual, output);
 
 
         }

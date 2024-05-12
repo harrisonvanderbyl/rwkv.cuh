@@ -42,7 +42,6 @@ public:
         this->thread->join();
     }
 
-
     void add_job(std::function<void()> job)
     {
         std::unique_lock<std::mutex> lck(this->mtx);
@@ -77,26 +76,30 @@ public:
     std::vector<ThreadStream> streams;
 
     size_t heads = 0;
+    bool debugmode = false;
     void sync(bool block = false)
     {
-        
+
         // create a shared atomic variable
-        std::atomic<int>& counter = *(new std::atomic<int>(0));
+        std::atomic<int> &counter = *(new std::atomic<int>(0));
         std::condition_variable cv;
 
-        
         auto size = this->streams.size();
         for (size_t i = 0; i < this->streams.size(); i++)
         {
-            this->streams[i].add_job([ i,&counter, size]()
+            this->streams[i].add_job([i, &counter, size, block]()
                                      {
+                                        if (i == 0 && block){
+
+            std::cout << "Hard sync, please only use in testing!" << std::endl;
+                                     }
+                                    
                                          
                                          counter.fetch_add(1);
                                          while (counter.load() < size)
                                          {
                                              std::this_thread::yield();
-                                         }
-                                     });
+                                         } });
         }
 
         // if (block)
@@ -106,19 +109,19 @@ public:
         //             { return counter->load() == this->streams.size(); });
         // }
 
-        if (block){
+        if (block)
+        {
 
-            std::cout << "Hard sync, please only use in testing!" << std::endl;
-            while (counter.load() != this->streams.size()){
+            while (counter.load() != this->streams.size())
+            {
                 std::this_thread::sleep_for(std::chrono::microseconds(18));
-            
             }
-
         }
     }
-    ThreadPool(size_t threadsNum)
+    ThreadPool(size_t threadsNum, bool debug = false)
     {
         heads = threadsNum;
+        this->debugmode = debug;
         for (size_t i = 0; i < threadsNum; i++)
         {
             this->streams.push_back(ThreadStream());
@@ -145,8 +148,28 @@ public:
             this->streams[i].stop();
         }
     }
+
+    void debug(Tensor t, std::string message = "")
+    {
+        if (!debugmode)
+        {
+            return;
+        }
+        sync(true);
+        // create a print job
+        auto job = [t, message]
+        {
+            std::cout << message << std::endl;
+            std::cout << t << std::endl;
+        };
+
+        // add the job to the first stream
+        this->streams[0].add_job(job);
+
+        sync(true);
+    }
 };
 
-ThreadPool *get_threadpool(size_t threadsNum = 0);
+ThreadPool *get_threadpool(size_t threadsNum = 0, bool debug = false);
 
 #endif // TENSOR_OPERATORS_THREADING_THREADING_H_

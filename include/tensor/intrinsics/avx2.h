@@ -86,6 +86,18 @@ static inline const float dot_uint8_floats(u_int8_t *input, float *other, size_t
     return reduce_float(zz1);
 }
 
+static inline const float dot_floats(float *input, float *other, size_t size)
+{
+    auto zz1 = _mm256_setzero_ps();
+
+    for (auto k = 0; k < size; k += get_simd_width())
+    {
+        zz1 = _mm256_fmadd_ps(_mm256_load_ps(input + k), _mm256_load_ps(other + k), zz1);
+    }
+
+    return reduce_float(zz1);
+}
+
 static inline const void simd_wkv(size_t size, size_t bhofseti, size_t bbhhofseti, void* vv, void* ss, float kkk, float uuu, float www, float rrr, void* out)
 {
     auto rrrn = _mm256_set1_ps(rrr);

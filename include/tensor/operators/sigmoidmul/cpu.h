@@ -4,6 +4,7 @@
 
 #include "tensor/intrinsics/intrinsics.h"
 
+#include "tensor/operators/threading/threading.h"
 void sigmoidmul_cpu_kernel(void *input, void *other, void *residual, void *output, size_t size, TENSORTYPE dtype, size_t dims)
 {
 

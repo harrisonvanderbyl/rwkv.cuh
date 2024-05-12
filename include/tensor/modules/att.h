@@ -52,7 +52,7 @@ class Attention
         Tensor operator()(Tensor input, Tensor residual){
 
 
-            if(buffer.data == nullptr || buffer.shape[0] * buffer.shape[1]* buffer.shape[2] < input.shape[0] * input.shape[1]* input.shape[2] || buffer.dtype != input.dtype || buffer.device != input.device){
+            if(buffer.data == nullptr || buffer.shape[0] * buffer.shape[1]* buffer.shape[2] < input.shape[1] * input.shape[2]* input.shape[3] || buffer.dtype != input.dtype || buffer.device != input.device){
                 buffer = Tensor({input.shape[1], input.shape[2], input.shape[3]}, input.dtype, input.device);
             }
 
@@ -60,10 +60,17 @@ class Attention
             
             auto pool = get_threadpool();
             pool->sync();
+            pool->debug(input[0], "mix k");
+            pool->debug(input[1], "mix r");
+            pool->debug(input[2], "mix v");
+
             auto k = this->key(input[0]);
             auto r = this->receptance(input[1]);
             auto v = this->value(input[2]);
 
+            pool->debug(k, "start k");
+            pool->debug(v, "start v");
+            pool->debug(r, "start r");
             
             auto xm = this->state.wkv5(r,k,v,this->time_decay,this->time_faaaa, cbuf);
             

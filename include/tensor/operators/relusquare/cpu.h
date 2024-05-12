@@ -4,6 +4,7 @@
 #include "tensor/tensor.h"
 #include "tensor/intrinsics/intrinsics.h"
 
+#include "tensor/operators/threading/threading.h"
 void relusquare_cpu_kernel(void *input, void *output, size_t size, TENSORTYPE dtype, size_t dims)
 {
     size_t simdwidth = get_simd_width();

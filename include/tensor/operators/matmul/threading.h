@@ -8,6 +8,8 @@
 #include "tensor/tensor.h"
 #include "tensor/operators/matmul/cpu.h"
 
+#include "tensor/operators/threading/threading.h"
+
 void matmul8_cpu_kernal(uint8_t *A, void *B, void *C, void *Ao, void *Ar, size_t BBT, size_t INSHAPE, size_t OUTSHAPE)
 {
 
@@ -38,6 +40,28 @@ void matmul8_cpu_kernal(uint8_t *A, void *B, void *C, void *Ao, void *Ar, size_t
 
 void matmul_cpu_kernal(void *A, void *B, void *C, size_t BBT, size_t INSHAPE, size_t OUTSHAPE, TENSORTYPE dtype)
 {
+        ThreadPool *pool = get_threadpool();
+
+    auto headsize = OUTSHAPE / pool->heads;
+    for (size_t head = 0; head < pool->heads; head++)
+    {
+        pool->add_job(
+            [A, B, C, BBT, INSHAPE, OUTSHAPE, headsize, head]()
+            {
+                for (size_t bbt = 0; bbt < BBT; bbt += 1)
+                {
+
+                    const auto BAINSHAPE = flp(B) + bbt * INSHAPE;
+
+                    for (size_t b = head*headsize; b < (head + 1)*headsize; b += 1)
+                    {
+                        auto zz1 = dot_floats(flp(A) + b*INSHAPE, BAINSHAPE, INSHAPE);
+
+                        (flp(C) + bbt * OUTSHAPE)[b] +=  zz1;
+                    }
+                } },
+            head);
+    }
 }
 
 void wkv5_cpu_kernel(void *kk, void *vv, void *ww, void *uu, void *rr, void *ss, void *out, size_t T, size_t B, size_t C, size_t H, TENSORTYPE dtype)

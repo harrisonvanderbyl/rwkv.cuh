@@ -122,6 +122,19 @@ static inline const float dot_uint8_floats(u_int8_t *input, float *other, size_t
     return reduce_float(zz1);
 }
 
+
+static inline const float dot_floats(float *input, float *other, size_t size)
+{
+    auto zz1 = vdupq_n_f32(0);
+
+    for (auto k = 0; k < size; k += get_simd_width())
+    {
+        zz1 = vmlaq_f32(zz1, vld1q_f32(input + k), vld1q_f32(other + k));
+    }
+
+    return reduce_float(zz1);
+}
+
 static inline const void simd_wkv(size_t size, size_t bhofseti, size_t bbhhofseti, void* vv, void* ss, float kkk, float uuu, float www, float rrr, void* out)
 {
     auto rrrn = vdupq_n_f32(rrr);

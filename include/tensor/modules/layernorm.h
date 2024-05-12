@@ -33,7 +33,7 @@ class LayerNorm
             this->buffer = other.buffer;
         }
 
-        Tensor operator()(Tensor& input){
+        Tensor operator()(Tensor input){
 
             if(buffer.data == nullptr || buffer.shape[0] * buffer.shape[1] < input.shape[0] * input.shape[1] || buffer.dtype != input.dtype || buffer.device != input.device){
                 buffer = Tensor({input.shape[0],input.shape[1], input.shape[2]}, input.dtype, input.device);

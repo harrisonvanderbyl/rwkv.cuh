@@ -3,7 +3,6 @@
 #define TENSOR_TENSOR_H
 #include <iostream>
 #include "nlohmann/json.hpp"
-#include "tensor/operators/threading/threading.h"
 #if defined(__ARM_NEON)
 #define ARMONLY(x) x
 #define AVXONLY(x)
@@ -519,7 +518,7 @@ struct Tensor{
     }
 
     Tensor relusquared();
-    Tensor sigmoidmul(Tensor& other, Tensor& residual);
+    Tensor& sigmoidmul(Tensor& other, Tensor& residual, Tensor& output);
     Tensor lerp(Tensor& A, Tensor& B, Tensor& C);
     Tensor swishmul(Tensor& other);
     Tensor matmul(Tensor& other, Tensor residual = Tensor());

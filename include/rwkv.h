@@ -7,6 +7,7 @@
 #include "tensor/modules/linear.h"
 #include "tensor/modules/block.h"
 
+#include "tensor/operators/threading/threading.h"
 class RWKV
 {
 
@@ -21,13 +22,13 @@ public:
     size_t layers;
     size_t max_batch_seq = 0;
 
-    RWKV(std::string path, size_t threadsNum = 8)
+    RWKV(std::string path, size_t threadsNum = 8, bool debug = false)
     {
         std::ifstream inFile;
         inFile.open(path, std::ios::binary);
         model = safetensors(inFile);
 
-        auto pool = get_threadpool(threadsNum);
+        auto pool = get_threadpool(threadsNum, debug);
         pool->start();
         
 
@@ -62,13 +63,13 @@ public:
 
     Tensor operator()(std::vector<std::vector<size_t>> input)
     {
-        auto x = emb1(input);
-        x = ln0(x);
+        auto rx = emb1(input);
+        auto x = ln0(rx);
         
 
         for (size_t i = 0; i < layers; i++)
         {
-            x = blocks[i](x);
+            blocks[i](x);
         }
         auto xm = ln_out(x);
         

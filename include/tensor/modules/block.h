@@ -23,14 +23,15 @@ class Block
             ffnshift = TimeShift(model["blocks." + std::to_string(layerID) + ".ffnshift.time_mix"]);
             ffn = FeedForward(layerID, model);
         }
-        Tensor operator()(Tensor x){
+        void operator()(Tensor x){
             // get cuda error
             check_for_errors();
             auto threadpool = get_threadpool();
+            threadpool->debug(x, "start x");
             auto attout = att(attshift(ln1(x)), x);
-            auto ffnout = ffn(ffnshift(ln2(attout)), attout);
-            return ffnout;
-            
+
+            threadpool->debug(attout, "att out");
+            ffn(ffnshift(ln2(attout)), attout, x);
         }
 
 };

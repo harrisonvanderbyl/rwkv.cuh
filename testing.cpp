@@ -1,38 +1,46 @@
-#include "tensor/tensor.h"
-#include "tensor/modules/timeshift.h"
+#include <iostream>
+#include <string>
+#include <fstream>
+#include "rwkv.h"
+#include "chrono"
+// #include "sampler/sample.hpp"
+#include "tokenizer/tokenizer.hpp"
+#include "thread"
+#include "atomic"
+#include "sampler/sample.h"
 
-int main( int argc, char* argv[] ){
-    Tensor a = Tensor({5,2048});
-    Tensor b = Tensor({2048});
-    Tensor c = Tensor({2048});
-    Tensor d = Tensor({5,2048});
+#include "tensor/operators/threading/threading.h"
 
-    ThreadPool* threadpool = get_threadpool(argc > 1 ? std::stoi(argv[1]) : 0);
-    for (int i = 0; i < 2048; i++){
-        for (int j = 0; j < 5; j++){
-            a[j][i] = rand() % 100;
-        }
+
+
+
+int main( int argc, char** argv ){
+
+   
+
+    std::string path = "./model.safetensors";
+    if (argc > 1)
+    {
+        path = argv[1];
     }
-    for (int i = 0; i < 2048; i++){
-        b[i] = rand() % 100;
+
+    size_t threads = 8;
+    if (argc > 2)
+    {
+        threads = std::stoi(argv[2]);
     }
-    for (int i = 0; i < 2048; i++){
-        c[i] = rand() % 100;
-    }
 
-    a.normalize(b,c,d, argc > 2 ? std::stoi(argv[2]) : 1);
+    RWKV model(path, threads, true);
 
-    threadpool->sync();
+    // model.cuda();
+    auto logits = model({{0}});
 
-    a.lerp(b,c,d);
+    auto pool = get_threadpool();
 
-    threadpool->start();
+    pool->start();
 
+    pool->sync(true);
 
+    pool->stop();
 
-    threadpool->sync(true);
-
-    std::cout << d << std::endl;
 }
-
-//[0, 0.977977, ..., 20904.8, 20931.5]
