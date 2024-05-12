@@ -152,7 +152,7 @@ static inline const void simd_wkv(size_t B, size_t T,size_t H,size_t Z, size_t b
         {
             auto kv = vmulq_f32(vld1q_f32(k+j), vdupq_n_f32(v[i]));
             auto sss = vld1q_f32(s+i*Z+j);
-            acc = vfmaq_f32(acc, vfmaq_f32(kv,vld1q_f32(u+j) , sss),vld1q_f32(r+j));
+            acc = vfmaq_f32(acc, vfmaq_f32(sss,vld1q_f32(u+j) , kv),vld1q_f32(r+j));
             vst1q_f32(s+i*Z+j, vfmaq_f32(sss,vld1q_f32(w+j),kv));
 
         }
