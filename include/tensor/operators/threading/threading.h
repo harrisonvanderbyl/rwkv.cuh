@@ -168,6 +168,20 @@ public:
 
         sync(true);
     }
+
+    void print(std::string message)
+    {
+        // create a print job
+        auto job = [message]
+        {
+            std::cout << message;
+            std::cout << std::flush;
+        };
+
+        // add the job to the first stream
+        this->streams[0].add_job(job);
+
+    }
 };
 
 ThreadPool *get_threadpool(size_t threadsNum = 0, bool debug = false);

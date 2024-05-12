@@ -23,7 +23,7 @@ void run(RWKV* model,Tensor logitsin)
     if (sample == 0)
     {
         output = "User";
-        std::cout << "Error:0";
+        pool->print("\n");
     }
     else
     {
@@ -38,15 +38,13 @@ void run(RWKV* model,Tensor logitsin)
         vnn += ": ";
     }
 
-    std::cout << vnn;
-    // flush cout
-    std::cout << std::flush;
+    pool->print(vnn);
 
     if (output == "User")
     {
         std::string input = "";
         std::getline(std::cin, input);
-        std::cout << "\n";
+        pool->print("\n");
         auto logits = model->operator()({worldTokenizer.encode("User: " + input + "\n\nAssistant:")});
         pool->add_job(
             [logits, model]()
@@ -111,6 +109,6 @@ int main(int argc, char **argv)
     while (1)
     {
         std::this_thread::yield();
-        std::this_thread::sleep_for(std::chrono::nanoseconds(1));
+        std::this_thread::sleep_for(std::chrono::seconds(1));
     }
 }
