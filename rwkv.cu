@@ -18,7 +18,7 @@ void run(RWKV* model,Tensor logitsin)
 
     auto pool = get_threadpool();
     auto logs = (logitsin[0][logitsin.shape[1] - 1]);
-    size_t sample = dart((float *)logs.data, 1.0, 0.5);
+    size_t sample = dart((float *)logs.data, 1.0, 0.75);
     std::string output = "";
     if (sample == 0)
     {
