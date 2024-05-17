@@ -12,7 +12,7 @@
 #include "tensor/operators/threading/threading.h"
 RWKVTokenizer worldTokenizer("rwkv_vocab_v20230424.txt");
 
-void run(RWKV* model,Tensor logitsin)
+void run(RWKV& model,Tensor logitsin)
 {
     // std::cout << "Generating token " << i << std::endl;
 
@@ -45,9 +45,9 @@ void run(RWKV* model,Tensor logitsin)
         std::string input = "";
         std::getline(std::cin, input);
         pool->print("\n");
-        auto logits = model->operator()({worldTokenizer.encode("User: " + input + "\n\nAssistant:")});
+        auto logits = model({worldTokenizer.encode("User: " + input + "\n\nAssistant:")});
         pool->add_job(
-            [logits, model]()
+            [logits, &model]()
             {
                 run(model,logits);
             },
@@ -56,9 +56,9 @@ void run(RWKV* model,Tensor logitsin)
     else
     {
 
-        auto logits = model->operator()({{sample}});
+        auto logits = model({{sample}});
         pool->add_job(
-            [logits, model]()
+            [logits, &model]()
             {
                 run(model,logits);
             },
@@ -102,7 +102,7 @@ int main(int argc, char **argv)
     pool->add_job(
         [logitsstart,&model]()
         {
-            run(&model, logitsstart);
+            run(model, logitsstart);
         },
         0);
 
