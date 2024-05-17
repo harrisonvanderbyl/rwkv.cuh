@@ -15,5 +15,5 @@ export HEADERFILES="$HEADERFILES -I./include"
 export RELEASE="-O3 --use_fast_math --forward-unknown-to-host-compiler -ffast-math -Xptxas -O3 -march=native"
 
 # nvcc ./rwkv.cu ./src/cpuops.cpp  -I$HEADERFILES -L$LIBRARYFILES $DEBUG $RELEASE -o ./rwkv.out -arch=sm_80 -g add gprof flags
-g++ -x c++ ./rwkv.cu ./src/cpuops.cpp  -I./include -o ./rwkvcpu.out -pthread -std=c++17 -march=native -O3 -ffast-math #-ggdb -pg
+g++ -x c++ ./rwkv.cpp ./src/cpuops.cpp  -I./include -o ./rwkvcpu.out -pthread -std=c++17 -march=native -O3 -ffast-math #-ggdb -pg
 # g++ -x c++ ./testing.cpp ./src/cpuops.cpp  -I./include -o ./tests.out -pthread -std=c++17 -march=native -O3 -ffast-math 
