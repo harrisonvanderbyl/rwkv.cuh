@@ -16,7 +16,6 @@ class Embedding
             if (buffer.data == nullptr || buffer.shape[0] * buffer.shape[1] < indices.size() * indices[0].size() || buffer.dtype != weight.dtype ){
                 buffer = Tensor({indices.size(), indices[0].size(), weight.shape[1]}, weight.dtype, buffer.device);
             }
-            
             auto cbuf = buffer.cloneWithFalseReshape({indices.size(), indices[0].size(), weight.shape[1]});
 
             return weight.gather(indices, cbuf);

@@ -32,7 +32,7 @@ class Attention
 
             auto dims = model[prefix + "receptance.weight"].shape[1];
             this->n_head = dims/this->head_size;
-            this->state = Tensor({16, this->n_head , this->head_size, this->head_size});
+            this->state = Tensor({1, this->n_head , this->head_size, this->head_size});
             
             this->time_decay = model[prefix + "time_decay"];
             this->time_faaaa = model[prefix + "time_faaaa"];
@@ -72,19 +72,30 @@ class Attention
             pool->debug(v, "start v");
             pool->debug(r, "start r");
             
+            check_for_errors();
             auto xm = this->state.wkv5(r,k,v,this->time_decay,this->time_faaaa, cbuf);
+            pool->debug(xm, "start xm");
             
+            check_for_errors();
             
             auto xxa = this->ln_x(xm);
+            pool->debug(xxa, "start xxa");
             
+            check_for_errors();
             auto gv = this->gate(input[3]);
+            pool->debug(gv, "start gv");
 
+            check_for_errors();
             
             auto gvo = gv.swishmul(xxa);
+            pool->debug(gvo, "start gvo");
             
+            check_for_errors();
             pool->sync();
             auto out = this->output(gvo, residual);
+            pool->debug(out, "start out");
 
+            check_for_errors();
 
             return out;
         }

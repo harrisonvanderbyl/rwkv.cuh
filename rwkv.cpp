@@ -18,7 +18,7 @@ void run(RWKV& model,Tensor logitsin)
 
     auto pool = get_threadpool();
     auto logs = (logitsin[0][logitsin.shape[1] - 1]);
-    size_t sample = dart((float *)logs.data, 1.0, 0.75);
+    size_t sample = dart((float *)logs.cpu().data, 1.0, 0.75);
     std::string output = "";
     if (sample == 0)
     {
@@ -82,6 +82,11 @@ int main(int argc, char **argv)
     }
 
     RWKV model(path, threads);
+
+    if (argc > 3)
+    {
+        model.cuda();
+    }
 
     std::string instruction = "System: You are a multi-lingual language model created by recursalAI and the RWKV group. Help the user with their tasks.\n\nUser: ";
 

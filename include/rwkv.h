@@ -67,18 +67,18 @@ public:
     {
         auto rx = emb1(input);
         auto x = ln0(rx);
-        
 
         for (size_t i = 0; i < layers; i++)
         {
             blocks[i](x);
         }
         auto xm = ln_out(x);
-        
+        check_for_errors();
         auto pool = get_threadpool(); 
         pool->sync();
         auto out = output(xm);
 
+        check_for_errors();
         pool->sync();
         return out;
 
@@ -172,14 +172,19 @@ public:
     }
 
     void cuda(int device = 0){
-
+        std::cout << "Cudaing" << std::endl;
         emb1.cuda();
+        std::cout << "Cudaed emb1" << std::endl;
         ln0.cuda();
+        std::cout << "Cudaed ln0" << std::endl;
         ln_out.cuda();
+        std::cout << "Cudaed ln_out" << std::endl;
         output.cuda();
+        std::cout << "Cudaed output" << std::endl;
 
         for (size_t i = 0; i < layers; i++)
         {
+            std::cout << "Cudaing block" << i << std::endl;
             blocks[i].ln1.cuda();
             blocks[i].ln2.cuda();
             blocks[i].att.gate.cuda();

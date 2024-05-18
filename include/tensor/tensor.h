@@ -474,9 +474,14 @@ struct Tensor{
         if (device == DEVICE::CUDA){
             return *this;
         } else {
+            if(data == nullptr){
+                return Tensor(shape,nullptr,dtype, DEVICE::CUDA, device_id);
+            }
             Tensor new_tensor = Tensor(shape, dtype, DEVICE::CUDA, device_id);
-            if(data !=nullptr){
-                cudaMemcpy(new_tensor.data, data, data_size_in_bytes, cudaMemcpyHostToDevice);
+            cudaMemcpy(new_tensor.data, data, data_size_in_bytes, cudaMemcpyHostToDevice);
+            check_for_errors();
+            if (new_tensor.data == nullptr){
+                throw std::runtime_error("cuda failed to allocate memory");
             }
             return new_tensor;
         }
@@ -519,7 +524,7 @@ struct Tensor{
 
     Tensor relusquared();
     Tensor& sigmoidmul(Tensor& other, Tensor& residual, Tensor& output);
-    Tensor lerp(Tensor& A, Tensor& B, Tensor& C);
+    Tensor shift(Tensor& input, Tensor& output, Tensor& state, size_t indims);
     Tensor swishmul(Tensor& other);
     Tensor matmul(Tensor& other, Tensor residual = Tensor());
     Tensor matmul(Tensor &Art, Tensor &Aot, Tensor &Bt, Tensor residual = Tensor());

@@ -151,11 +151,22 @@ public:
 
     void debug(Tensor t, std::string message = "")
     {
+        
         if (!debugmode)
         {
             return;
         }
+
+
         sync(true);
+
+        if (t.device == DEVICE::CUDA)
+        {
+            std::cout << message << std::endl;
+            std::cout << t << std::endl;
+            
+        }
+        else{
         // create a print job
         auto job = [t, message]
         {
@@ -165,7 +176,7 @@ public:
 
         // add the job to the first stream
         this->streams[0].add_job(job);
-
+        }
         sync(true);
     }
 

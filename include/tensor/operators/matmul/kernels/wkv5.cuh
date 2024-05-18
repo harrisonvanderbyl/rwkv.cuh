@@ -57,7 +57,9 @@ __global__ void wkvatt(size_t TT, size_t CH, T *kk, T *vv, T *rr, T *ww, T *uu, 
 
                 // out[t,bb,hh,j] += r[t,bb,hh,i]*(s[bb,hh,i,j] + atu*u[hh,i] )
                 auto sssatuuuu = (atu * uuu + sss);
-
+                if (i == 0){
+                    out[jind] = 0.0f;
+                }
                 out[jind] += T(sssatuuuu * rrr);
 
                 ss[sind] = sss * www + atu;

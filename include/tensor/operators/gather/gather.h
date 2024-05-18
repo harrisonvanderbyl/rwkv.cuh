@@ -18,6 +18,7 @@ inline Tensor Tensor::operator[](const size_t index) {
 inline Tensor Tensor::gather(std::vector<std::vector<size_t>> indices, Tensor out = Tensor()) {
     
     if (out.data == nullptr) {
+        std::cout << "out.data is null\n";
         out = Tensor({indices.size(), indices[0].size(), shape[1]}, dtype, out.device, device_id);
     }
 
@@ -33,9 +34,9 @@ inline Tensor Tensor::gather(std::vector<std::vector<size_t>> indices, Tensor ou
                 memcpy(to, from, shape[1] * get_dtype_bytes(dtype));
             } else if (device == DEVICE::CPU && out.device == DEVICE::CUDA)
             {
-                cudaMemcpy(out[i][j].data, (*this)[indices[i][j]].data, shape[1] * get_dtype_bytes(dtype), cudaMemcpyDeviceToDevice);
-            }else{
                 cudaMemcpy(out[i][j].data, (*this)[indices[i][j]].data, shape[1] * get_dtype_bytes(dtype), cudaMemcpyHostToDevice);
+            }else{
+                cudaMemcpy(out[i][j].data, (*this)[indices[i][j]].data, shape[1] * get_dtype_bytes(dtype), cudaMemcpyDeviceToDevice);
             }
         }
     }
