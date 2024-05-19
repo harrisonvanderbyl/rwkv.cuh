@@ -1,8 +1,8 @@
 #ifndef MATMULF_CUH
 #define MATMULF_CUH
 #include "tensor/operators/matmul/kernels/globals.cuh"
-template <typename T>
-__global__ void matmulfp_kernal(T*  A, T* B, T* C, size_t INSHAPE, size_t OUTSHAPE){
+
+__global__ void matmulfp_kernal(float*  A, float* B, float* C, size_t INSHAPE, size_t OUTSHAPE){
     size_t bbt = blockIdx.x * blockDim.x + threadIdx.x;
     size_t ii = blockIdx.y * blockDim.y + threadIdx.y;
     size_t k = blockIdx.z * blockDim.z + threadIdx.z;
@@ -19,7 +19,7 @@ __global__ void matmulfp_kernal(T*  A, T* B, T* C, size_t INSHAPE, size_t OUTSHA
         }
 
 
-        atomicAdd(C + bbt * OUTSHAPE + i, T(acc));
+        atomicAdd(C + bbt * OUTSHAPE + i, (acc));
 
     }
 }

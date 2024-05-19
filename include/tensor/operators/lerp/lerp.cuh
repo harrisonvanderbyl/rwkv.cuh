@@ -1,8 +1,7 @@
 #ifndef __LERP_CU__
 #define __LERP_CU__
 
-template <typename T>
-__global__ void lerp_kernel(T *inputdata, T *outputdata, T *mixdata, size_t dims, size_t outputchannels, size_t seq, size_t batches, size_t headsize, T *statedata)
+__global__ void lerp_kernel(float *inputdata, float *outputdata, float *mixdata, size_t dims, size_t outputchannels, size_t seq, size_t batches, size_t headsize, float *statedata)
 {
     auto k = blockIdx.x;
     auto j = blockIdx.y;
@@ -19,7 +18,7 @@ __global__ void lerp_kernel(T *inputdata, T *outputdata, T *mixdata, size_t dims
         auto startofmixin = l != 0 ? inputdata + k * seq * dims + (l - 1) * dims + i * headsize : statedata + k * dims + i * headsize;
         for (size_t m = 0; m < headsize; m += 1)
         {
-            startofoutput[m] = startofinput[m] * startofmix[m] + startofmixin[m] * (T(1) - startofmix[m]);
+            startofoutput[m] = startofinput[m] * startofmix[m] + startofmixin[m] * (1.0f - startofmix[m]);
         }
         if (l == seq - 1 & j == outputchannels - 1)
         {
@@ -44,10 +43,6 @@ void lerp_cuda_kernel(void *inputdata, void *outputdata, void *mixdata, size_t d
     if (dtype == TENSORTYPE::kFLOAT_32)
     {
         lerp_kernel<<<blocks, threads>>>((float *)inputdata, (float *)outputdata, (float *)mixdata, dims, outputchannels, seq, batches, headsize, (float *)statedata);
-    }
-    else if (dtype == TENSORTYPE::kBFLOAT_16)
-    {
-        lerp_kernel<<<blocks, threads>>>((bfloat16 *)inputdata, (bfloat16 *)outputdata, (bfloat16 *)mixdata, dims, outputchannels, seq, batches, headsize, (bfloat16 *)statedata);
     }
     else
     {

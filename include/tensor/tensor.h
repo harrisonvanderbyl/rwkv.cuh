@@ -90,7 +90,7 @@ static float bfloat16_to_float32(bfloat16 value){
 #define bfloat16 __nv_bfloat16
 static float bfloat16_to_float32(bfloat16 value){
 
-    return float(value);
+    return __bfloat162float(value);
 
 }
 

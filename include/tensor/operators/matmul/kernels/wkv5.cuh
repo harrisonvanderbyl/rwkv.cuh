@@ -1,8 +1,8 @@
 #ifndef WKV_CUH
 #define WKV_CUH
 #include "tensor/operators/matmul/kernels/globals.cuh"
-template <typename T>
-__global__ void wkvatt(size_t TT, size_t CH, T *kk, T *vv, T *rr, T *ww, T *uu, float *ss, T *out, size_t H)
+
+__global__ void wkvatt(size_t TT, size_t CH, float *kk, float *vv, float *rr, float *ww, float *uu, float *ss, float *out, size_t H)
 {
 
     // bb is batch
@@ -61,7 +61,7 @@ __global__ void wkvatt(size_t TT, size_t CH, T *kk, T *vv, T *rr, T *ww, T *uu, 
                     out[jind] = 0.0f;
                 }
                 __syncthreads();
-                out[jind] += T(sssatuuuu * rrr);
+                out[jind] += sssatuuuu * rrr;
 
                 ss[sind] = sss * www + atu;
 
@@ -75,8 +75,6 @@ void  wkv5_cuda_kernel(void* kk, void* vv, void* ww, void* uu, void* rr, void* s
     dim3 dimGrid(H);
     if (dtype == TENSORTYPE::kFLOAT_32)
         wkvatt<<<dimGrid, dimBlock>>>(T, C / H, (float *)kk, (float *)vv, (float *)rr, (float *)ww, (float *)uu, (float *)ss, (float *)out, H);
-    else if (dtype == TENSORTYPE::kBFLOAT_16)
-        wkvatt<<<dimGrid, dimBlock>>>(T, C / H, (bfloat16 *)kk, (bfloat16 *)vv, (bfloat16 *)rr, (bfloat16 *)ww, (bfloat16 *)uu, (float *)ss, (bfloat16 *)out, H);
     else
         throw std::runtime_error("wkv5 not implemented for this dtype");
 }

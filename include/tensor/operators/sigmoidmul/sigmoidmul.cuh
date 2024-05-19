@@ -11,12 +11,6 @@ __global__ void sigmoidmul_kernel(float *a, float *b, float *residual, float *c,
     }
 }
 
-__global__ void sigmoidmul_kernel(bfloat16 *a, bfloat16 *b, bfloat16 *residual, bfloat16 *c, size_t size) {
-    size_t idx = blockIdx.x * blockDim.x + threadIdx.x;
-    if (idx < size) {
-        c[idx] = float(b[idx]) / (1.0f+ exp(float(-a[idx]))) + float(residual[idx]);
-    }
-}
 
 void sigmoidmul_cuda_kernel(void* input, void* other, void* residual, void* output, size_t size, TENSORTYPE dtype){
    
@@ -25,8 +19,6 @@ void sigmoidmul_cuda_kernel(void* input, void* other, void* residual, void* outp
 
     if (dtype == TENSORTYPE::kFLOAT_32)
         sigmoidmul_kernel<<<blocks, threads>>>((float*)input, (float*)other, (float*)residual, (float*)output, size);
-    else if (dtype == TENSORTYPE::kBFLOAT_16)
-        sigmoidmul_kernel<<<blocks, threads>>>((bfloat16*)input, (bfloat16*)other, (bfloat16*)residual, (bfloat16*)output, size);
     else
         throw std::runtime_error("sigmoidmul only implemented for float and bfloat16");
 }

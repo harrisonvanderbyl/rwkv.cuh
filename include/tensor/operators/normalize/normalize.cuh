@@ -3,8 +3,7 @@
 #include <cuda_runtime.h>
 #include "tensor/tensor.h"
 
-template <typename T>
-__global__ void layernorm(T* input, T* output, T* weight, T* bias, size_t size, size_t lastshape, size_t headshape, float eps = 1e-5, size_t splitshape = 768){
+__global__ void layernorm(float* input, float* output, float* weight, float* bias, size_t size, size_t lastshape, size_t headshape, float eps = 1e-5, size_t splitshape = 768){
     size_t bb = blockIdx.x;
     size_t ist = threadIdx.y;
     size_t hh = threadIdx.x;
@@ -30,7 +29,7 @@ __global__ void layernorm(T* input, T* output, T* weight, T* bias, size_t size, 
     float invstd = (1.0f) / sqrt(var + eps);
 
     for (size_t i = istart; i < iend; i+=1){
-        output[i] = (input[i] - T(mean)) * T(invstd) * weight[hh*headshape + i-start] + bias[hh*headshape + i-start];
+        output[i] = (input[i] - (mean)) * (invstd) * weight[hh*headshape + i-start] + bias[hh*headshape + i-start];
     }
 }
 
@@ -49,8 +48,6 @@ void normalize_cuda_kernel(void* input, void* weight, void* bias, void* output, 
        
         if (dtype == TENSORTYPE::kFLOAT_32)
             layernorm<<<blocks, headsperblock>>>((float*)input, (float*)output, (float*)weight, (float*)bias, size, lastshape, headshape, eps, splitshape);
-        else if (dtype == TENSORTYPE::kBFLOAT_16)
-            layernorm<<<blocks, headsperblock>>>((bfloat16*)input, (bfloat16*)output, (bfloat16*)weight, (bfloat16*)bias, size, lastshape, headshape, eps, splitshape);
         else
             throw std::runtime_error("Unsupported datatype for normalize, only float32 and bfloat16 are supported on CUDA");
         

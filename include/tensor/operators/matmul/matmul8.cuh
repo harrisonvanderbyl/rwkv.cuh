@@ -23,8 +23,6 @@ void matmul_cuda_kernal(void* A, void* B, void* C, size_t BBT, size_t INSHAPE, s
     if (dtype == TENSORTYPE::kFLOAT_32)
         // matmulfp_kernal<<<dimGrid, dimBlock>>>((float *)A, (float *)B, (float *)C, INSHAPE, OUTSHAPE);
         matmulfp_kernal<<<dimGrid, dimBlock>>>((float *)A, (float *)B, (float *)C, INSHAPE, OUTSHAPE);
-    else if (dtype == TENSORTYPE::kBFLOAT_16)
-        matmulfp_kernal<<<dimGrid, dimBlock>>>((__nv_bfloat16 *)A, (__nv_bfloat16 *)B, (__nv_bfloat16 *)C, INSHAPE, OUTSHAPE);
     else
         throw std::runtime_error("matmul not implemented for this dtype");
 }
