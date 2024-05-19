@@ -76,6 +76,7 @@ public:
         check_for_errors();
         auto pool = get_threadpool(); 
         pool->sync();
+        xm = xm.cpu();
         auto out = output(xm);
 
         check_for_errors();
@@ -179,7 +180,7 @@ public:
         std::cout << "Cudaed ln0" << std::endl;
         ln_out.cuda();
         std::cout << "Cudaed ln_out" << std::endl;
-        output.cuda();
+        // output.cuda();
         std::cout << "Cudaed output" << std::endl;
 
         for (size_t i = 0; i < layers; i++)
