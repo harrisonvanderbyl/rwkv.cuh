@@ -21,9 +21,9 @@ __global__ void kernelc_mm8_one(
 
     const unsigned long long k0 = blockIdx.x * tsplit;
 
-#pragma unroll
-    for (unsigned long long token = 0; token < tokenlength; token++)
-    {
+    const unsigned long long token = threadIdx.y;
+
+
         const auto *xk = (x + token * INPUTSIZE * 2);
 
         float sum = 0.0f;
@@ -50,7 +50,7 @@ __global__ void kernelc_mm8_one(
 
             atomicAdd(y + OUTPUTSIZE * token + k + k0, y_local * r[k0 + k] + off * sum);
         }
-    }
+    
 }
 
 void matmul8_cuda_kernal(uint8_t *A, void *B, void *C, void *Ao, void *Ar, size_t BBT, size_t INSHAPE, size_t OUTSHAPE)
@@ -62,8 +62,8 @@ void matmul8_cuda_kernal(uint8_t *A, void *B, void *C, void *Ao, void *Ar, size_
     //    auto jsplit = INSHAPE/blockSize.x;
     //     auto tsplit = OUTSHAPE/gridSize.x;
 
-    dim3 blockSize(INSHAPE / jsplit);
-    dim3 gridSize(OUTSHAPE / tsplit);
+    dim3 blockSize(INSHAPE / jsplit, 1, 1);
+    dim3 gridSize(OUTSHAPE / tsplit, BBT,1);
     kernelc_mm8_one<<<gridSize, blockSize>>>(
         INSHAPE, OUTSHAPE, (bfloat16 *)B, A, (float *)Ar, (float *)Ao, (float *)C, BBT);
 }

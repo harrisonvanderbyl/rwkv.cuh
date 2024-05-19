@@ -21,7 +21,7 @@ class TimeShift
         }
 
         TimeShift(Tensor time_mix){
-            std::vector<size_t> state_size = {1, 1, time_mix.shape[1]};
+            std::vector<size_t> state_size = {16, 1, time_mix.shape[1]};
             // std::cout << "TimeShift:" << state_size[0] << std::endl;
             this->state = Tensor(state_size);
 
