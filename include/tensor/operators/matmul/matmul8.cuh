@@ -31,28 +31,9 @@ void matmul_cuda_kernal(void* A, void* B, void* C, size_t BBT, size_t INSHAPE, s
 
 
 
-void matmul8_cuda_kernal(uint8_t* A, void* B, void* C, void* Ao, void* Ar, size_t BBT, size_t INSHAPE, size_t OUTSHAPE){  
-   
-   
-    
-    dim3 blockSize(INSHAPE/MM8_ONE_JSPLIT);
-    dim3 gridSize(OUTSHAPE/MM8_ONE_TILE);
-    kernelc_mm8_one<<<gridSize, blockSize>>>(
-        INSHAPE, OUTSHAPE, (float*)B, A, (float*)Ar, (float*)Ao, (float*)C, BBT);
-}
 
 
 
 
-void  wkv5_cuda_kernel(void* kk, void* vv, void* ww, void* uu, void* rr, void* ss, void* out, size_t T, size_t B, size_t C, size_t H, TENSORTYPE dtype){
-    dim3 dimBlock(H);
-    dim3 dimGrid(B);
-    if (dtype == TENSORTYPE::kFLOAT_32)
-        wkvatt<<<dimGrid, dimBlock>>>(T, C / H, (float *)kk, (float *)vv, (float *)rr, (float *)ww, (float *)uu, (float *)ss, (float *)out, H);
-    else if (dtype == TENSORTYPE::kBFLOAT_16)
-        wkvatt<<<dimGrid, dimBlock>>>(T, C / H, (bfloat16 *)kk, (bfloat16 *)vv, (bfloat16 *)rr, (bfloat16 *)ww, (bfloat16 *)uu, (float *)ss, (bfloat16 *)out, H);
-    else
-        throw std::runtime_error("wkv5 not implemented for this dtype");
-}
 
 #endif

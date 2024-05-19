@@ -2,11 +2,13 @@
 #define MATMUL8_CUH
 
 #include "tensor/operators/matmul/kernels/globals.cuh"
+#include <cuda_bf16.h>
+#define jsplit 32
+#define tsplit 16
 
-template <typename DTYPE>
 __global__ void kernelc_mm8_one(
     const unsigned long long INPUTSIZE, const unsigned long long OUTPUTSIZE,
-    const DTYPE *__restrict__ const x,
+    const bfloat16 *__restrict__ const x,
     const uint8_t *__restrict__ const w,
     const float *__restrict__ const r,
     const float *__restrict__ const o,
@@ -15,34 +17,55 @@ __global__ void kernelc_mm8_one(
 
 {
 
-    const unsigned long long j0 = (threadIdx.x) * MM8_ONE_JSPLIT;
-    const unsigned long long j1 = (threadIdx.x + 1) * MM8_ONE_JSPLIT;
-    
-    const unsigned long long k0 = blockIdx.x * MM8_ONE_TILE;
-    const unsigned long long k1 = (blockIdx.x + 1) * MM8_ONE_TILE;
-        
+    const unsigned long long j0 = (threadIdx.x) * jsplit;
 
-    #pragma unroll
+    const unsigned long long k0 = blockIdx.x * tsplit;
+
+#pragma unroll
     for (unsigned long long token = 0; token < tokenlength; token++)
     {
-        
+        const auto *xk = (x + token * INPUTSIZE * 2);
 
-        #pragma unroll
-        for (unsigned long long k = k0; k < k1; ++k)
+        float sum = 0.0f;
+
+#pragma unroll
+        for (unsigned long long j = 0; j < jsplit; j++)
         {
-        
-            float y_local = 0;
-            float off = o[k]/r[k];
+            sum += float(x[token * INPUTSIZE * 2 + (j0 + j) * 2 + 1]);
+        }
 
-            #pragma unroll
-            for (unsigned long long j = j0; j < j1; ++j)
+#pragma unroll
+        for (unsigned long long k = 0; k < tsplit; ++k)
+        {
+
+            auto y_local = 0.0f;
+            auto off = o[k0 + k];
+            const auto *wk = (w + (k + k0) * INPUTSIZE);
+
+#pragma unroll
+            for (unsigned long long j = 0; j < jsplit; j++)
             {
-                y_local += float(x[token * INPUTSIZE + j]) * ((w[k * INPUTSIZE + j] + off));
+                y_local += float(xk[(j0 + j) * 2 + 1] * __ushort2bfloat16_rn(wk[(j0 + j)]));
             }
 
-            atomicAdd(y + OUTPUTSIZE * token + k , y_local * r[k] );
+            atomicAdd(y + OUTPUTSIZE * token + k + k0, y_local * r[k0 + k] + off * sum);
         }
     }
+}
+
+void matmul8_cuda_kernal(uint8_t *A, void *B, void *C, void *Ao, void *Ar, size_t BBT, size_t INSHAPE, size_t OUTSHAPE)
+{
+
+    //     dim3 blockSize(32);
+    //     dim3 gridSize(1024);
+
+    //    auto jsplit = INSHAPE/blockSize.x;
+    //     auto tsplit = OUTSHAPE/gridSize.x;
+
+    dim3 blockSize(INSHAPE / jsplit);
+    dim3 gridSize(OUTSHAPE / tsplit);
+    kernelc_mm8_one<<<gridSize, blockSize>>>(
+        INSHAPE, OUTSHAPE, (bfloat16 *)B, A, (float *)Ar, (float *)Ao, (float *)C, BBT);
 }
 
 #endif // MATMUL8_CUH

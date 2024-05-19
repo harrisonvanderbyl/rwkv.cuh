@@ -7,8 +7,9 @@ __global__ void wkvatt(size_t TT, size_t CH, T *kk, T *vv, T *rr, T *ww, T *uu, 
 
     // bb is batch
     // hh is head
-    size_t bb = blockIdx.x ;
-    size_t hh = threadIdx.x;
+    size_t hh = blockIdx.x ;
+    size_t bb = threadIdx.x;
+    size_t j = threadIdx.y;
     // 1d
     uint32_t bsize = H * TT * CH;
 
@@ -43,8 +44,7 @@ __global__ void wkvatt(size_t TT, size_t CH, T *kk, T *vv, T *rr, T *ww, T *uu, 
             float rrr = float(rr[iind]);
             float www = float(ww[hoffseti]);
 
-            for (uint32_t j = 0; j < CH; j += 1)
-            {
+           
                 uint32_t jind = bhofseti + j;
                 uint32_t sind = bbhhofseti + j;
 
@@ -60,12 +60,25 @@ __global__ void wkvatt(size_t TT, size_t CH, T *kk, T *vv, T *rr, T *ww, T *uu, 
                 if (i == 0){
                     out[jind] = 0.0f;
                 }
+                __syncthreads();
                 out[jind] += T(sssatuuuu * rrr);
 
                 ss[sind] = sss * www + atu;
+
             }
         }
-    }
+    
+}
+
+void  wkv5_cuda_kernel(void* kk, void* vv, void* ww, void* uu, void* rr, void* ss, void* out, size_t T, size_t B, size_t C, size_t H, TENSORTYPE dtype){
+    dim3 dimBlock(B,C/H,1);
+    dim3 dimGrid(H);
+    if (dtype == TENSORTYPE::kFLOAT_32)
+        wkvatt<<<dimGrid, dimBlock>>>(T, C / H, (float *)kk, (float *)vv, (float *)rr, (float *)ww, (float *)uu, (float *)ss, (float *)out, H);
+    else if (dtype == TENSORTYPE::kBFLOAT_16)
+        wkvatt<<<dimGrid, dimBlock>>>(T, C / H, (bfloat16 *)kk, (bfloat16 *)vv, (bfloat16 *)rr, (bfloat16 *)ww, (bfloat16 *)uu, (float *)ss, (bfloat16 *)out, H);
+    else
+        throw std::runtime_error("wkv5 not implemented for this dtype");
 }
 
 #endif 

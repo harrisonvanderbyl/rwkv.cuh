@@ -15,9 +15,11 @@ void softmax(float* logits)
     }
     for (size_t i = 0; i < ALEN; i++)
     {
-        logits[i] = exp(logits[i]) / sum;
+        logits[i] = exp(logits[i] - log(sum));
     }
 };
+
+// v $ b = log(exp(v) + exp(b))
 
 /*
 def sample_logits(out, temperature=1.0, top_p=0.8):
