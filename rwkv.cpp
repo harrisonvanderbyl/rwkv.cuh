@@ -12,13 +12,15 @@
 #include "tensor/operators/threading/threading.h"
 RWKVTokenizer worldTokenizer("rwkv_vocab_v20230424.txt");
 
+float temp = 1.0;
+
 void run(RWKV& model,Tensor logitsin)
 {
     // std::cout << "Generating token " << i << std::endl;
 
     auto pool = get_threadpool();
     auto logs = (logitsin[0][logitsin.shape[1] - 1]);
-    size_t sample = dart((float *)logs.cpu().data, 1.0, 0.75);
+    size_t sample = dart((float *)logs.cpu().data, temp);
     std::string output = "";
     if (sample == 0)
     {
@@ -86,6 +88,11 @@ int main(int argc, char **argv)
     if (argc > 3)
     {
         model.cuda();
+    }
+
+    if (argc > 4)
+    {
+        temp = std::stof(argv[4]);
     }
 
     std::string instruction = "System: You are a multi-lingual language model created by recursalAI and the RWKV group. Help the user with their tasks.\n\nUser: ";

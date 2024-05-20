@@ -120,16 +120,19 @@ size_t typical(float* logits, double _temp = 1.33, double _tau = 0.0)
 };
 
 
-size_t dart(float* logits, double _temp = 1.0, double _tau = 0.6)
+size_t dart(float* logits, double _temp = 1.0)
 {
-    softmax(logits);
     double max = double(*std::max_element(logits, logits+ALEN));
     double min = double(*std::min_element(logits, logits+ALEN));
-    auto topp = _tau;
-    auto dart = double(rand()) / RAND_MAX;
-    dart = pow(dart, _temp);
-    min = min + (max - min) * (1.0-topp);
-    dart = min * (1 - dart) + max * dart;
+    // create a file
+    auto dart = (double(rand()) / RAND_MAX);
+    dart = pow(dart, 1-pow(dart, _temp * pow(dart,10)));
+   
+
+    dart = min + dart * (max - min);
+   
+
+    
     
     auto out = std::min_element(logits, logits+ALEN, [dart](const float& lhs, const float& rhs) {
         return std::abs(lhs - dart) < std::abs(rhs - dart);
