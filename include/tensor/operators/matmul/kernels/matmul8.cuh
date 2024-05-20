@@ -21,7 +21,7 @@ __global__ void kernelc_mm8_one(
 
     const unsigned long long k0 = blockIdx.x * tsplit;
 
-    const unsigned long long token = threadIdx.y;
+    const unsigned long long token = blockIdx.y;
 
 
         const auto *xk = (x + token * INPUTSIZE * 2);
