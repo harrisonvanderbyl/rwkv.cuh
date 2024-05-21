@@ -45,7 +45,7 @@ __global__ void kernelc_mm8_one(
 #pragma unroll
             for (unsigned long long j = 0; j < jsplit; j++)
             {
-                y_local += __bfloat162float(xk[(j0 + j) * 2 + 1] * __ushort2bfloat16_rn(wk[(j0 + j)]));
+                y_local += __bfloat162float(xk[(j0 + j) * 2 + 1] * __float2bfloat16(float(wk[(j0 + j)])));
             }
 
             atomicAdd(y + OUTPUTSIZE * token + k + k0, y_local * r[k0 + k] + off * sum);
