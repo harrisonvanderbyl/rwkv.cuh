@@ -24,7 +24,7 @@ public:
     size_t layers;
     size_t max_batch_seq = 0;
 
-    RWKV(std::string path, size_t threadsNum = 0, bool debug = false)
+    RWKV(std::string path, size_t threadsNum = 0, bool debug = false, size_t max_batch = 1)
     {
         std::ifstream inFile;
         inFile.open(path, std::ios::binary);
@@ -60,7 +60,7 @@ public:
         for (size_t i = 0; i < layers; i++)
         {
             // std::cout << "Block" << i << std::endl;
-            blocks.push_back(Block(model, i));
+            blocks.push_back(Block(model, i, max_batch));
         }
 
     }

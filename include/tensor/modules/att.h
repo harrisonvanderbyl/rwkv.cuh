@@ -24,7 +24,7 @@ class Attention
         Attention(){
         }
         
-        Attention(int layerID, safetensors& model){
+        Attention(int layerID, safetensors& model, size_t batch_size = 1){
             // std::cout << "Attentioncreate:" << layerID << std::endl;
             std::string prefix = "blocks." + std::to_string(layerID) + ".att.";
             this->layer = layerID;
@@ -32,7 +32,7 @@ class Attention
 
             auto dims = model[prefix + "receptance.weight"].shape[1];
             this->n_head = dims/this->head_size;
-            this->state = Tensor({16, this->n_head , this->head_size, this->head_size});
+            this->state = Tensor({batch_size, this->n_head , this->head_size, this->head_size});
             
             this->time_decay = model[prefix + "time_decay"];
             this->time_faaaa = model[prefix + "time_faaaa"];

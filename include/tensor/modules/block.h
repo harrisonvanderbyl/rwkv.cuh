@@ -14,13 +14,13 @@ class Block
         TimeShift attshift;
         TimeShift ffnshift;
         
-        Block(safetensors& model, size_t layerID){
+        Block(safetensors& model, size_t layerID, size_t batch_size = 1){
             layerid = layerID;
             ln1 = LayerNorm(model["blocks." + std::to_string(layerID) + ".ln1.weight"], model["blocks." + std::to_string(layerID) + ".ln1.bias"]);
             ln2 = LayerNorm(model["blocks." + std::to_string(layerID) + ".ln2.weight"], model["blocks." + std::to_string(layerID) + ".ln2.bias"]);
-            attshift = TimeShift(model["blocks." + std::to_string(layerID) + ".attshift.time_mix"]);
-            att = Attention(layerID, model);
-            ffnshift = TimeShift(model["blocks." + std::to_string(layerID) + ".ffnshift.time_mix"]);
+            attshift = TimeShift(model["blocks." + std::to_string(layerID) + ".attshift.time_mix"], batch_size);
+            att = Attention(layerID, model, batch_size);
+            ffnshift = TimeShift(model["blocks." + std::to_string(layerID) + ".ffnshift.time_mix"], batch_size);
             ffn = FeedForward(layerID, model);
         }
         void operator()(Tensor x){
