@@ -24,16 +24,28 @@ function() {
 to remove the function from the CPU build
 */
 #if defined(__CUDACC__)
-#define CUDAONLY
+static bool has_cuda(){
+    return true;
+}
 #else
-#define CUDAONLY if (false)
-#define cudaMemcpy(...) throw std::runtime_error("Not compiled with cuda")
-#define cudaMalloc(...) throw std::runtime_error("Not compiled with cuda")
-#define cudaMemset(...) throw std::runtime_error("Not compiled with cuda")
-#define cudaMallocHost(pointer, size) *pointer = malloc(size)
+// make sure is overwritable during linking
+static bool has_cuda();
+static void cudaMemcpy(void* dst, void* src, size_t size, int type);
+// #define cudaMalloc(...) throw std::runtime_error("Not compiled with cuda")
+static void cudaMalloc(void** pointer, size_t size);
+// #define cudaMemset(...) throw std::runtime_error("Not compiled with cuda")
+static void cudaMemset(void* pointer, int value, size_t size);  
+// #define cudaMallocHost(pointer, size) *pointer = malloc(size)
+static void cudaMallocHost(void** pointer, size_t size);
+
+size_t cudaMemcpyDeviceToHost;
+size_t cudaMemcpyHostToDevice;
+size_t cudaMemcpyDeviceToDevice;
 
 
 #endif
+
+#define CUDAONLY if (has_cuda())
 
 // if windows, define posix_memalign
 #if defined(_WIN32) || defined(_WIN64)
@@ -470,22 +482,8 @@ struct Tensor{
         }
     }
 
-    Tensor cuda(){
-        if (device == DEVICE::CUDA){
-            return *this;
-        } else {
-            if(data == nullptr){
-                return Tensor(shape,nullptr,dtype, DEVICE::CUDA, device_id);
-            }
-            Tensor new_tensor = Tensor(shape, dtype, DEVICE::CUDA, device_id);
-            cudaMemcpy(new_tensor.data, data, data_size_in_bytes, cudaMemcpyHostToDevice);
-            check_for_errors();
-            if (new_tensor.data == nullptr){
-                throw std::runtime_error("cuda failed to allocate memory");
-            }
-            return new_tensor;
-        }
-    }
+    Tensor cuda();
+    
 
     Tensor cpu(){
         if (device == DEVICE::CPU){
@@ -599,6 +597,31 @@ struct Tensor{
 
     inline Tensor reshape(std::vector<size_t> shape);
 };
+
+#if defined(__CUDACC__)
+Tensor Tensor::cuda()
+{
+        if (device == DEVICE::CUDA){
+            return *this;
+        } else {
+            if(data == nullptr){
+                return Tensor(shape,nullptr,dtype, DEVICE::CUDA, device_id);
+            }
+            Tensor new_tensor = Tensor(shape, dtype, DEVICE::CUDA, device_id);
+            cudaMemcpy(new_tensor.data, data, data_size_in_bytes, cudaMemcpyHostToDevice);
+            check_for_errors();
+            if (new_tensor.data == nullptr){
+                throw std::runtime_error("cuda failed to allocate memory");
+            }
+            return new_tensor;
+        }
+}
+#else
+Tensor __attribute__((weak))Tensor::cuda()
+{
+    throw std::runtime_error("Not compiled with cuda");
+}
+#endif
 
 #include "tensor/operators/ops.h"
 
