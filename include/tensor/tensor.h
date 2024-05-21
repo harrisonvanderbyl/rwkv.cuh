@@ -3,6 +3,7 @@
 #define TENSOR_TENSOR_H
 #include <iostream>
 #include "nlohmann/json.hpp"
+#include "tensor/intrinsics/shared.h"
 #if defined(__ARM_NEON)
 #define ARMONLY(x) x
 #define AVXONLY(x)
@@ -15,37 +16,35 @@
 #endif
 
 
-/*
-Define 
-#pragma CUDAONLY
-function() {
-    // code
-}
-to remove the function from the CPU build
-*/
-#if defined(__CUDACC__)
-static bool has_cuda(){
-    return true;
-}
-#else
-// make sure is overwritable during linking
-static bool has_cuda();
-static void cudaMemcpy(void* dst, void* src, size_t size, int type);
+
+
+// void cudaMemcpy(void* dst, void* src, size_t size, int type);
 // #define cudaMalloc(...) throw std::runtime_error("Not compiled with cuda")
-static void cudaMalloc(void** pointer, size_t size);
+
+#if !defined(__CUDACC__)
+
+#define CUDAONLY(x) void __attribute__((weak)) x{throw std::runtime_error("Not compiled with cuda");}
+
+CUDAONLY(cudaMemset(void* pointer, int value, size_t size))
+// void cudaMalloc(void** pointer, size_t size);
 // #define cudaMemset(...) throw std::runtime_error("Not compiled with cuda")
-static void cudaMemset(void* pointer, int value, size_t size);  
+CUDAONLY(cudaMalloc(void** pointer, size_t size))
+// void cudaMemset(void* pointer, int value, size_t size);  
 // #define cudaMallocHost(pointer, size) *pointer = malloc(size)
-static void cudaMallocHost(void** pointer, size_t size);
+CUDAONLY(cudaMallocHost(void** pointer, size_t size))
+// void cudaMallocHost(void** pointer, size_t size);
+CUDAONLY(cudaFree(void* pointer))
+
+CUDAONLY(cudaMemcpy(void* dst, void* src, size_t size, int type))
+
 
 size_t cudaMemcpyDeviceToHost;
 size_t cudaMemcpyHostToDevice;
 size_t cudaMemcpyDeviceToDevice;
 
-
+#else
+#define CUDAONLY(x) void x;
 #endif
-
-#define CUDAONLY if (has_cuda())
 
 // if windows, define posix_memalign
 #if defined(_WIN32) || defined(_WIN64)
@@ -145,14 +144,6 @@ static bfloat16 float32_to_bfloat16(float value){
 }
 
 #endif
-
-
-
-
-
-
-#define flp(x) ((float*)(x))
-#define bflp(x) ((bfloat16*)(x))
 
 
 static std::ostream& operator<<(std::ostream& os, const bfloat16& value){

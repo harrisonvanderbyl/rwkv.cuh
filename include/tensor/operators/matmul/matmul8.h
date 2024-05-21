@@ -6,13 +6,13 @@
 
 
 void matmul8_cpu_kernal(uint8_t* A, void* B, void* C, void* Ao, void* Ar, size_t BBT, size_t INSHAPE, size_t OUTSHAPE);
-void matmul8_cuda_kernal(uint8_t* A, void* B, void* C, void* Ao, void* Ar, size_t BBT, size_t INSHAPE, size_t OUTSHAPE);
+CUDAONLY(matmul8_cuda_kernal(uint8_t* A, void* B, void* C, void* Ao, void* Ar, size_t BBT, size_t INSHAPE, size_t OUTSHAPE))
 
 void matmul_cpu_kernal(void* A, void* B, void* C, size_t BBT, size_t INSHAPE, size_t OUTSHAPE, TENSORTYPE dtype);
-void matmul_cuda_kernal(void* A, void* B, void* C, size_t BBT, size_t INSHAPE, size_t OUTSHAPE,TENSORTYPE dtype);
+CUDAONLY(matmul_cuda_kernal(void* A, void* B, void* C, size_t BBT, size_t INSHAPE, size_t OUTSHAPE,TENSORTYPE dtype))
 
 void wkv5_cpu_kernel(void* kk, void* vv, void* ww, void* uu, void* rr, void* ss, void* out, size_t T, size_t B, size_t C, size_t H, TENSORTYPE dtype);
-void wkv5_cuda_kernel(void* kk, void* vv, void* ww, void* uu, void* rr, void* ss, void* out, size_t T, size_t B, size_t C, size_t H, TENSORTYPE dtype);
+CUDAONLY(wkv5_cuda_kernel(void* kk, void* vv, void* ww, void* uu, void* rr, void* ss, void* out, size_t T, size_t B, size_t C, size_t H, TENSORTYPE dtype))
 
 inline Tensor Tensor::matmul(Tensor &Art, Tensor &Aot,
                       Tensor &Bt, Tensor Ct)
@@ -42,7 +42,7 @@ inline Tensor Tensor::matmul(Tensor &Art, Tensor &Aot,
     {
         matmul8_cpu_kernal((uint8_t *)A, (void *)B, (void *)C, (void *)Ao, (void *)Ar, BB * T, INSHAPE, OUTSHAPE);
     }
-    else CUDAONLY
+    else
     {
 
         
@@ -78,7 +78,7 @@ inline Tensor Tensor::matmul(Tensor &Bt, Tensor Ct)
     if(Bt.device==DEVICE::CPU){
         matmul_cpu_kernal((void *)A, (void *)B, (void *)C, BB * T, INSHAPE, OUTSHAPE, Bt.dtype);
     } 
-    else CUDAONLY
+    else
     {
     
         
@@ -110,7 +110,7 @@ inline Tensor Tensor::wkv5(Tensor &r, Tensor &k, Tensor &v, Tensor &w, Tensor &u
     {
         wkv5_cpu_kernel(kk, vv, ww, uu, rr, ss, out, T, B, C, H, rdtype);
     }
-    else CUDAONLY
+    else
     {
 
         

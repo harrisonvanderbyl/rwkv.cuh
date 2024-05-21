@@ -4,7 +4,7 @@
 #include "tensor/tensor.h"
 
 void relusquare_cpu_kernel(void* input, void* output, size_t size, TENSORTYPE dtype, size_t dims);
-void relusquare_cuda_kernel(void* input, void* output, size_t size, TENSORTYPE dtype);
+CUDAONLY(relusquare_cuda_kernel(void* input, void* output, size_t size, TENSORTYPE dtype))
 
 inline Tensor Tensor::relusquared(){
     Tensor output = *this;
@@ -13,7 +13,7 @@ inline Tensor Tensor::relusquared(){
     if (device == DEVICE::CPU){
         relusquare_cpu_kernel(this->data, output.data, size, dtype, this->shape[2]);
     }
-    else CUDAONLY
+    else
     {
     
         relusquare_cuda_kernel(this->data, output.data, size, dtype);

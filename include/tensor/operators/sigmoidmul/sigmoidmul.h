@@ -5,7 +5,7 @@
 
 
 void sigmoidmul_cpu_kernel(void* input, void* other, void* residual, void* output, size_t size, TENSORTYPE dtype, size_t dims);
-void sigmoidmul_cuda_kernel(void* input, void* other, void* residual, void* output, size_t size, TENSORTYPE dtype);
+CUDAONLY(sigmoidmul_cuda_kernel(void* input, void* other, void* residual, void* output, size_t size, TENSORTYPE dtype))
 
 inline Tensor& Tensor::sigmoidmul(Tensor& other, Tensor& residual, Tensor& output){
     
@@ -13,7 +13,7 @@ inline Tensor& Tensor::sigmoidmul(Tensor& other, Tensor& residual, Tensor& outpu
     if (this->device == DEVICE::CPU){
         sigmoidmul_cpu_kernel(this->data, other.data, residual.data, output.data, size, dtype, this->shape[2]);
     }
-    else CUDAONLY
+    else
     {
         sigmoidmul_cuda_kernel(this->data, other.data, residual.data, output.data, size, dtype);
     }

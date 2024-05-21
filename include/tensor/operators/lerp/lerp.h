@@ -4,7 +4,7 @@
 #include "tensor/tensor.h"
 #include "tensor/operators/threading/threading.h"
 
-void lerp_cuda_kernel(void* inputdata, void* outputdata, void* mixdata, size_t dims, size_t outputchannels, size_t seq, size_t batches, void* statedata, TENSORTYPE dtype);
+CUDAONLY(lerp_cuda_kernel(void* inputdata, void* outputdata, void* mixdata, size_t dims, size_t outputchannels, size_t seq, size_t batches, void* statedata, TENSORTYPE dtype))
 void lerp_cpu_kernel(void* w, void* A, void* B, void* output, size_t size, size_t loopsize, TENSORTYPE dtype);
 
 
@@ -60,7 +60,7 @@ inline Tensor Tensor::shift(Tensor& input, Tensor& output, Tensor& state, size_t
         
         threadpool->sync();
     }
-    else CUDAONLY
+    else
     {
         lerp_cuda_kernel(input.data, output.data, data, indims, shape[0], input.shape[1], input.shape[0], state.data, dtype);
     }  

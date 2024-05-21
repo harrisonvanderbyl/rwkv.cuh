@@ -16,6 +16,7 @@
         "cstdlib": "cpp",
         "cwchar": "cpp",
         "cwctype": "cpp",
+        "cuh": "cu",
         "deque": "cpp",
         "string": "cpp",
         "unordered_map": "cpp",
@@ -81,6 +82,7 @@
         "stack": "cpp",
         "__mutex_base": "cpp",
         "__hash_table": "cpp",
-        "__tree": "cpp"
+        "__tree": "cpp",
+        "__bit_reference": "cpp"
     }
 }
