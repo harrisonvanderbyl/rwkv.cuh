@@ -3,7 +3,7 @@
 
 #include "tensor/tensor.h"
 
-void relusquare_cpu_kernel(void* input, void* output, size_t size, TENSORTYPE dtype, size_t dims);
+static void relusquare_cpu_kernel(void* input, void* output, size_t size, TENSORTYPE dtype, size_t dims);
 CUDAONLY(relusquare_cuda_kernel(void* input, void* output, size_t size, TENSORTYPE dtype))
 
 inline Tensor Tensor::relusquared(){

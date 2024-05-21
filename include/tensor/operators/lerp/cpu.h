@@ -4,7 +4,7 @@
 #include "tensor/tensor.h"
 #include "tensor/intrinsics/intrinsics.h"
 
-void lerp_cpu_kernel(void *w, void *A, void *B, void *output, size_t size, size_t loopsize, TENSORTYPE dtype)
+static void lerp_cpu_kernel(void *w, void *A, void *B, void *output, size_t size, size_t loopsize, TENSORTYPE dtype)
 {
     size_t simdwidth = get_simd_width();
     if (dtype == TENSORTYPE::kFLOAT_32)

@@ -44,6 +44,7 @@ size_t cudaMemcpyDeviceToDevice;
 
 #else
 #define CUDAONLY(x) void x;
+#pragma message "Using CUDA"
 #endif
 
 // if windows, define posix_memalign

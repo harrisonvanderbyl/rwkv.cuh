@@ -221,7 +221,7 @@ public:
 #include "tensor/operators/threading/threading.h"
 
 static ThreadPool* threadpool = nullptr;
-ThreadPool* get_threadpool(size_t threadsNum, bool debug){
+static ThreadPool* get_threadpool(size_t threadsNum, bool debug){
     if (threadpool == nullptr)
     {
         if (threadsNum == 0)

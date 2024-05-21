@@ -10,7 +10,7 @@
 
 #include "tensor/operators/threading/threading.h"
 
-void matmul8_cpu_kernal(uint8_t *A, void *B, void *C, void *Ao, void *Ar, size_t BBT, size_t INSHAPE, size_t OUTSHAPE)
+static void matmul8_cpu_kernal(uint8_t *A, void *B, void *C, void *Ao, void *Ar, size_t BBT, size_t INSHAPE, size_t OUTSHAPE)
 {
 
     ThreadPool *pool = get_threadpool();
@@ -38,7 +38,7 @@ void matmul8_cpu_kernal(uint8_t *A, void *B, void *C, void *Ao, void *Ar, size_t
     }
 }
 
-void matmul_cpu_kernal(void *A, void *B, void *C, size_t BBT, size_t INSHAPE, size_t OUTSHAPE, TENSORTYPE dtype)
+static void matmul_cpu_kernal(void *A, void *B, void *C, size_t BBT, size_t INSHAPE, size_t OUTSHAPE, TENSORTYPE dtype)
 {
     ThreadPool *pool = get_threadpool();
 
@@ -64,7 +64,7 @@ void matmul_cpu_kernal(void *A, void *B, void *C, size_t BBT, size_t INSHAPE, si
     }
 }
 
-void wkv5_cpu_kernel(void *kk, void *vv, void *ww, void *uu, void *rr, void *ss, void *out, size_t T, size_t B, size_t C, size_t H, TENSORTYPE dtype)
+static void wkv5_cpu_kernel(void *kk, void *vv, void *ww, void *uu, void *rr, void *ss, void *out, size_t T, size_t B, size_t C, size_t H, TENSORTYPE dtype)
 {
 
     ThreadPool *pool = get_threadpool();

@@ -6,7 +6,7 @@
 
 
 #include "tensor/operators/threading/threading.h"
-void swishmul_cpu_kernel(void* input, void* other, void* output, size_t size, TENSORTYPE dtype,size_t dims){
+static void swishmul_cpu_kernel(void* input, void* other, void* output, size_t size, TENSORTYPE dtype,size_t dims){
 
     size_t simdwidth = get_simd_width();
 

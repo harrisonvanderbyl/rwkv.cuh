@@ -4,7 +4,7 @@
 #include "tensor/tensor.h"
 
 
-void swishmul_cpu_kernel(void* input, void* other, void* output, size_t size, TENSORTYPE dtype, size_t dims);
+static void swishmul_cpu_kernel(void* input, void* other, void* output, size_t size, TENSORTYPE dtype, size_t dims);
 CUDAONLY(swishmul_cuda_kernel(void* input, void* other, void* output, size_t size, TENSORTYPE dtype))
 
 inline Tensor Tensor::swishmul(Tensor& other){
