@@ -34,9 +34,9 @@ inline Tensor Tensor::gather(std::vector<std::vector<size_t>> indices, Tensor ou
                 memcpy(to, from, shape[1] * get_dtype_bytes(dtype));
             } else if (device == DEVICE::CPU && out.device == DEVICE::CUDA)
             {
-                cudaMemcpy(out[i][j].data, (*this)[indices[i][j]].data, shape[1] * get_dtype_bytes(dtype), cudaMemcpyHostToDevice);
+                RcudaMemcpy(out[i][j].data, (*this)[indices[i][j]].data, shape[1] * get_dtype_bytes(dtype), cudaMemcpyHostToDevice);
             }else{
-                cudaMemcpy(out[i][j].data, (*this)[indices[i][j]].data, shape[1] * get_dtype_bytes(dtype), cudaMemcpyDeviceToDevice);
+                RcudaMemcpy(out[i][j].data, (*this)[indices[i][j]].data, shape[1] * get_dtype_bytes(dtype), cudaMemcpyDeviceToDevice);
             }
         }
     }

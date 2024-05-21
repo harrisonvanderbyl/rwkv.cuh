@@ -18,25 +18,25 @@
 
 
 
-// void cudaMemcpy(void* dst, void* src, size_t size, int type);
-// #define cudaMalloc(...) throw std::runtime_error("Not compiled with cuda")
+// void RcudaMemcpy(void* dst, void* src, size_t size, int type);
+// #define RcudaMalloc(...) throw std::runtime_error("Not compiled with cuda")
 
 #if !defined(__CUDACC__)
 
 #define CUDAONLY(x) void __attribute__((weak)) x{throw std::runtime_error("Not compiled with cuda");}
+#define CUDAONLYE(x) size_t __attribute__((weak)) x{throw std::runtime_error("Not compiled with cuda");}
 
-CUDAONLY(cudaMemset(void* pointer, int value, size_t size))
-// void cudaMalloc(void** pointer, size_t size);
-// #define cudaMemset(...) throw std::runtime_error("Not compiled with cuda")
-CUDAONLY(cudaMalloc(void** pointer, size_t size))
-// void cudaMemset(void* pointer, int value, size_t size);  
-// #define cudaMallocHost(pointer, size) *pointer = malloc(size)
-CUDAONLY(cudaMallocHost(void** pointer, size_t size))
-// void cudaMallocHost(void** pointer, size_t size);
-CUDAONLY(cudaFree(void* pointer))
-
-CUDAONLY(cudaMemcpy(void* dst, void* src, size_t size, int type))
-
+void __attribute__((weak))RcudaMemset(void* pointer, int value, size_t size){
+    throw std::runtime_error("Not compiled with cuda");
+    
+}
+void __attribute__((weak))RcudaMemcpy(void* dst, void* src, size_t size, size_t type){
+    throw std::runtime_error("Not compiled with cuda");
+    
+}
+void __attribute__((weak))RcudaMalloc(void** pointer, size_t size){
+    throw std::runtime_error("Not compiled with cuda");
+}
 
 size_t cudaMemcpyDeviceToHost;
 size_t cudaMemcpyHostToDevice;
@@ -46,9 +46,19 @@ size_t cudaMemcpyDeviceToDevice;
 
 #else
 #define CUDAONLY(x) void x;
+void RcudaMemset(void* pointer, int value, size_t size){
+    cudaMemset(pointer, value, size);
+}
+void RcudaMemcpy(void* dst, void* src, size_t size, size_t type){
+    cudaMemcpy(dst, src, size, cudaMemcpyKind(type));
+}
+void RcudaMalloc(void** pointer, size_t size){
+    cudaMalloc(pointer, size);
+}
 #define CPUONLY(x) void __attribute__((weak)) x{throw std::runtime_error("Not compiled with cpu operators, to add cpuoperators to your nvcc program, add ./include/cpuops.cpp to your nvcc list, and add -Xcompiler -march=native");}
 #pragma message "Using CUDA"
 #endif
+
 
 // if windows, define posix_memalign
 #if defined(_WIN32) || defined(_WIN64)
@@ -76,6 +86,8 @@ static void check_for_errors (){
     // do nothing
 }
 #endif
+
+
 
 
 // define float16 and bfloat16
@@ -358,15 +370,15 @@ struct Tensor{
         }
 
         if (device == DEVICE::CUDA){
-            cudaMalloc(&this->data, this->data_size_in_bytes);
-            cudaMemset(this->data, 0, this->data_size_in_bytes);
+            RcudaMalloc(&this->data, this->data_size_in_bytes);
+            RcudaMemset(this->data, 0, this->data_size_in_bytes);
         } else if (device == DEVICE::ROCM){
-            cudaMalloc(&this->data, this->data_size_in_bytes);
+            RcudaMalloc(&this->data, this->data_size_in_bytes);
         } else if (device == DEVICE::VULKAN){
-            cudaMalloc(&this->data, this->data_size_in_bytes);
+            RcudaMalloc(&this->data, this->data_size_in_bytes);
         } else {
             posix_memalign(&this->data,64,this->data_size_in_bytes);
-            // cudaMallocHost(&this->data,this->data_size_in_bytes);
+            // RcudaMallocHost(&this->data,this->data_size_in_bytes);
 
             
             assert(this->data != nullptr);
@@ -396,7 +408,7 @@ struct Tensor{
     void empty(){
         if (data != nullptr){
             if (device == DEVICE::CUDA){
-                cudaMemset(data, 0, data_size_in_bytes);
+                RcudaMemset(data, 0, data_size_in_bytes);
             } else if (device == DEVICE::CPU){
                 memset(data, 0, data_size_in_bytes);
             } else{
@@ -462,15 +474,15 @@ struct Tensor{
     T get(size_t index)const{
         if (device == DEVICE::CUDA){
             T value;
-            cudaMemcpy(&value, (void*)((T*)data + index), get_dtype_bytes(dtype), cudaMemcpyDeviceToHost);
+            RcudaMemcpy(&value, (void*)((T*)data + index), get_dtype_bytes(dtype), cudaMemcpyDeviceToHost);
             return value;
         } else if (device == DEVICE::ROCM){
             T value;
-            cudaMemcpy(&value, (void*)((T*)data + index), get_dtype_bytes(dtype), cudaMemcpyDeviceToHost);
+            RcudaMemcpy(&value, (void*)((T*)data + index), get_dtype_bytes(dtype), cudaMemcpyDeviceToHost);
             return value;
         } else if (device == DEVICE::VULKAN){
             T value;
-            cudaMemcpy(&value, (void*)((T*)data + index), get_dtype_bytes(dtype), cudaMemcpyDeviceToHost);
+            RcudaMemcpy(&value, (void*)((T*)data + index), get_dtype_bytes(dtype), cudaMemcpyDeviceToHost);
             return value;
         } else {
             return ((T*)data)[index];
@@ -485,7 +497,7 @@ struct Tensor{
             return *this;
         } else {
             Tensor new_tensor = Tensor(shape, dtype, DEVICE::CPU, device_id);
-            cudaMemcpy(new_tensor.data, data, data_size_in_bytes, cudaMemcpyDeviceToHost);
+            RcudaMemcpy(new_tensor.data, data, data_size_in_bytes, cudaMemcpyDeviceToHost);
             return new_tensor;
         }
     }
@@ -530,11 +542,11 @@ struct Tensor{
     
     void copyfrom(Tensor other){
         if (device == DEVICE::CUDA){
-            cudaMemcpy(data, other.data, data_size_in_bytes, cudaMemcpyDeviceToDevice);
+            RcudaMemcpy(data, other.data, data_size_in_bytes, cudaMemcpyDeviceToDevice);
         } else if (device == DEVICE::ROCM){
-            cudaMemcpy(data, other.data, data_size_in_bytes, cudaMemcpyDeviceToDevice);
+            RcudaMemcpy(data, other.data, data_size_in_bytes, cudaMemcpyDeviceToDevice);
         } else if (device == DEVICE::VULKAN){
-            cudaMemcpy(data, other.data, data_size_in_bytes, cudaMemcpyDeviceToDevice);
+            RcudaMemcpy(data, other.data, data_size_in_bytes, cudaMemcpyDeviceToDevice);
         } else {
             memcpy(data, other.data, data_size_in_bytes);
         }
@@ -603,7 +615,7 @@ Tensor Tensor::cuda()
                 return Tensor(shape,nullptr,dtype, DEVICE::CUDA, device_id);
             }
             Tensor new_tensor = Tensor(shape, dtype, DEVICE::CUDA, device_id);
-            cudaMemcpy(new_tensor.data, data, data_size_in_bytes, cudaMemcpyHostToDevice);
+            RcudaMemcpy(new_tensor.data, data, data_size_in_bytes, cudaMemcpyHostToDevice);
             check_for_errors();
             if (new_tensor.data == nullptr){
                 throw std::runtime_error("cuda failed to allocate memory");
