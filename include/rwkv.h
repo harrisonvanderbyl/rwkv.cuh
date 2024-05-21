@@ -103,6 +103,15 @@ public:
         }
     }
 
+    void zero_state(size_t batchid = 0){
+        for (size_t i = 0; i < layers; i++)
+        {
+            blocks[i].att.state[batchid].empty();
+            blocks[i].attshift.state[batchid].empty();
+            blocks[i].ffnshift.state[batchid].empty();
+        }
+    }
+
     void set_state(std::map<std::string, Tensor> state, size_t batchid = 0){
         for (size_t i = 0; i < layers; i++)
         {
