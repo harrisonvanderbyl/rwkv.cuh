@@ -101,7 +101,7 @@ void simd_norm_assign(float *input, float mean, float vareps, float *weight, flo
 
 
 
-static inline const float dot_uint8_floats(u_int8_t *input, float *other, size_t size)
+inline const float dot_uint8_floats(u_int8_t *input, float *other, size_t size)
 {
     auto zz1 = vdupq_n_f32(0);
 
@@ -123,7 +123,7 @@ static inline const float dot_uint8_floats(u_int8_t *input, float *other, size_t
 }
 
 
-static inline const float dot_floats(float *input, float *other, size_t size)
+inline const float dot_floats(float *input, float *other, size_t size)
 {
     auto zz1 = vdupq_n_f32(0);
 
@@ -135,7 +135,7 @@ static inline const float dot_floats(float *input, float *other, size_t size)
     return reduce_float(zz1);
 }
 
-static inline const void simd_wkv(size_t B, size_t T,size_t H,size_t Z, size_t bb,size_t tt, size_t hh, float *vv, float *ss, float *kk, float *uu, float *ww, float *rr, float *yy)
+inline const void simd_wkv(size_t B, size_t T,size_t H,size_t Z, size_t bb,size_t tt, size_t hh, float *vv, float *ss, float *kk, float *uu, float *ww, float *rr, float *yy)
 {
     auto k = kk + bb*T*H*Z + tt*H*Z + hh*Z;
     auto v = vv + bb*T*H*Z + tt*H*Z + hh*Z;
