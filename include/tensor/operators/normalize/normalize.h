@@ -4,7 +4,7 @@
 #include "tensor/tensor.h"
 
 CUDAONLY(normalize_cuda_kernel(void* input, void* weight, void* bias, void* output, float eps, size_t lastshape, size_t headshape, size_t size, TENSORTYPE dtype))
-static void normalize_cpu_kernel(void* input, void* weight, void* bias, void* output, float eps, size_t lastshape, size_t headshape, size_t size, TENSORTYPE dtype);
+CPUONLY(normalize_cpu_kernel(void* input, void* weight, void* bias, void* output, float eps, size_t lastshape, size_t headshape, size_t size, TENSORTYPE dtype));
 // layernorm kernel
 
 

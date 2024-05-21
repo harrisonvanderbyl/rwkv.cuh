@@ -1,5 +1,10 @@
 #pragma once
 //ifdef avx2
+#ifdef __CUDACC__
+#include "tensor/intrinsics/fallback.h"
+#pragma message "Using fallback, you should not include the cpu operators from your cuda code"
+#else
+
 #ifdef __AVX512__
 #include "tensor/intrinsics/avx512.h"
 #pragma message "Using AVX512"
@@ -12,6 +17,7 @@
 #else
 #include "tensor/intrinsics/fallback.h"
 #pragma message "No simd intrinsics found, using fallback"
+#endif
 #endif
 
 float static inline sum_floats(float *input, size_t size)

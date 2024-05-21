@@ -42,8 +42,11 @@ size_t cudaMemcpyDeviceToHost;
 size_t cudaMemcpyHostToDevice;
 size_t cudaMemcpyDeviceToDevice;
 
+#define CPUONLY(x) void x; 
+
 #else
 #define CUDAONLY(x) void x;
+#define CPUONLY(x) void __attribute__((weak)) x{throw std::runtime_error("Not compiled with cpu operators, to add cpuoperators to your nvcc program, add ./include/cpuops.cpp to your nvcc list, and add -Xcompiler -march=native");}
 #pragma message "Using CUDA"
 #endif
 

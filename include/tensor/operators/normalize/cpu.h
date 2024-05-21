@@ -5,7 +5,7 @@
 #include "tensor/intrinsics/intrinsics.h"
 
 #include "tensor/operators/threading/threading.h"
-static void normalize_cpu_kernel(void *input, void *weight, void *bias, void *output, float eps, size_t lastshape, size_t headshape, size_t size, TENSORTYPE dtype)
+void normalize_cpu_kernel(void *input, void *weight, void *bias, void *output, float eps, size_t lastshape, size_t headshape, size_t size, TENSORTYPE dtype)
 {
     auto threadpool = get_threadpool(1);
     size_t simdwidth = get_simd_width();

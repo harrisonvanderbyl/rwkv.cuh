@@ -211,17 +211,10 @@ public:
     }
 };
 
-#include "tensor/operators/sigmoidmul/cpu.h"
-#include "tensor/operators/swishmul/cpu.h"
-#include "tensor/operators/relusquare/cpu.h"
-#include "tensor/operators/normalize/cpu.h"
-#include "tensor/operators/lerp/cpu.h"
-#include "tensor/operators/matmul/cpu.h"
-#include "tensor/operators/matmul/threading.h"
-#include "tensor/operators/threading/threading.h"
+
 
 static ThreadPool* threadpool = nullptr;
-static ThreadPool* get_threadpool(size_t threadsNum, bool debug){
+ThreadPool* __attribute__((weak)) get_threadpool(size_t threadsNum, bool debug){
     if (threadpool == nullptr)
     {
         if (threadsNum == 0)

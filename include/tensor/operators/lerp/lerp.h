@@ -5,7 +5,7 @@
 #include "tensor/operators/threading/threading.h"
 
 CUDAONLY(lerp_cuda_kernel(void* inputdata, void* outputdata, void* mixdata, size_t dims, size_t outputchannels, size_t seq, size_t batches, void* statedata, TENSORTYPE dtype))
-static void lerp_cpu_kernel(void* w, void* A, void* B, void* output, size_t size, size_t loopsize, TENSORTYPE dtype);
+CPUONLY(lerp_cpu_kernel(void* w, void* A, void* B, void* output, size_t size, size_t loopsize, TENSORTYPE dtype))
 
 
 inline Tensor Tensor::shift(Tensor& input, Tensor& output, Tensor& state, size_t indims){

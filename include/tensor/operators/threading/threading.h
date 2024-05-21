@@ -195,6 +195,6 @@ public:
     }
 };
 
-static ThreadPool *get_threadpool(size_t threadsNum = 0, bool debug = false);
+ThreadPool *get_threadpool(size_t threadsNum = 0, bool debug = false);
 
 #endif // TENSOR_OPERATORS_THREADING_THREADING_H_

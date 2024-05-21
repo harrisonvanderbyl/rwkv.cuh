@@ -17,4 +17,15 @@
 #include "tensor/operators/normalize/normalize.cuh"
 #include "tensor/operators/lerp/lerp.cuh"
 #include "tensor/operators/matmul/matmul8.cuh"
-#endif // __CUDACC__
+#else
+#include "tensor/operators/sigmoidmul/cpu.h"
+#include "tensor/operators/swishmul/cpu.h"
+#include "tensor/operators/relusquare/cpu.h"
+#include "tensor/operators/normalize/cpu.h"
+#include "tensor/operators/lerp/cpu.h"
+#include "tensor/operators/matmul/cpu.h"
+#include "tensor/operators/matmul/threading.h"
+#endif
+
+
+#include "tensor/operators/threading/threading.h"

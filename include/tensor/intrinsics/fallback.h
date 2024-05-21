@@ -9,21 +9,12 @@ static size_t get_simd_width()
     return 1;
 }
 
-#if !defined(__INTEL_LLVM_COMPILER)
 
-float simdexpfallback(float xx)
+float __attribute__((weak))simdexpfallback(float xx)
 {
-    auto x = flp(&xx);
-    return expf(-x[0]);
+    return expf(-xx);
 }
 
-#else
-
-float simdexpfallback(float xx)
-{
-    return exp(-xx);
-}
-#endif
 
 void __attribute__((weak)) simd_sigmoidmul(float *input, float *other, float *residual, float *output)
 {
