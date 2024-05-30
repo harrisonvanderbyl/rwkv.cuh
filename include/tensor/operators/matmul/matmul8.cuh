@@ -9,20 +9,15 @@
 
 
 
-size_t VSPLIT = 16;
-size_t HSPLIT = 8;
-
 
 
 void matmul_cuda_kernal(void* A, void* B, void* C, size_t BBT, size_t INSHAPE, size_t OUTSHAPE,TENSORTYPE dtype){
      
 
     
-    dim3 dimBlock(1, VSPLIT, HSPLIT);
-    dim3 dimGrid(BBT, ((OUTSHAPE/VSPLIT)/BLOCK_SIZE), ((INSHAPE/HSPLIT)/LOOPSIZE));
     if (dtype == TENSORTYPE::kFLOAT_32)
         // matmulfp_kernal<<<dimGrid, dimBlock>>>((float *)A, (float *)B, (float *)C, INSHAPE, OUTSHAPE);
-        matmulfp_kernal<<<dimGrid, dimBlock>>>((float *)A, (float *)B, (float *)C, INSHAPE, OUTSHAPE);
+        runSgemmWarptiling(BBT,INSHAPE,OUTSHAPE, (float *)A, (float *)B, (float *)C);
     else
         throw std::runtime_error("matmul not implemented for this dtype");
 }

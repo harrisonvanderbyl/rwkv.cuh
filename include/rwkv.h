@@ -194,9 +194,11 @@ public:
         output.cuda();
         std::cout << "Cudaed output" << std::endl;
 
+        auto pool = get_threadpool();
+
         for (size_t i = 0; i < layers; i++)
         {
-            std::cout << "Cudaing block" << i << std::endl;
+            pool->add_job([this, i, device](){
             blocks[i].ln1.cuda();
             blocks[i].ln2.cuda();
             blocks[i].att.gate.cuda();
@@ -214,8 +216,12 @@ public:
             blocks[i].ffn.key.cuda();
             blocks[i].ffn.value.cuda();
             blocks[i].ffn.receptance.cuda();
+            std::cout << "Block " << i << std::endl;
+            }, i);
   
         }
+
+        pool->sync(true);
         
     }
 };

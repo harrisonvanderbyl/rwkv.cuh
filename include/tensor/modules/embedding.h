@@ -17,11 +17,14 @@ class Embedding
                 buffer = Tensor({indices.size(), indices[0].size(), weight.shape[1]}, weight.dtype, buffer.device);
             }
             auto cbuf = buffer.cloneWithFalseReshape({indices.size(), indices[0].size(), weight.shape[1]});
-
+            if(indices.size() == 1 && indices[0].size() == 1){
+                return weight[indices[0][0]].cloneWithFalseReshape({1, 1, weight.shape[1]});
+            }
             return weight.gather(indices, cbuf);
         }
 
         void cuda(){
             this->buffer = this->buffer.cuda();
+            this->weight = this->weight.cuda();
         }
 };
