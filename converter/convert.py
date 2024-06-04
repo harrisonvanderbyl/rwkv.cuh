@@ -67,6 +67,8 @@ for key in tqdm.tqdm(keys):
             
             quant_cpp.quantize_cpu(mww, model[key+".range"] , model[key+".zero"],model[key], weight.shape[1], weight.shape[0], True)
             
+            model[key+".range"]  = model[key+".range"].bfloat16()
+            model[key+".zero"]  = model[key+".zero"].bfloat16()
             
             # model[key] = model.pop(key).t().contiguous().cpu()
         else:
