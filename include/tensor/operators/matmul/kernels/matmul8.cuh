@@ -373,12 +373,12 @@ __global__ void kernelc_mm8_one(
   // bfloat16 xsum = __shfl_sync(0xffffffff, sumate, 0);
   __shared__ __nv_bfloat162 hotspace[32][32];
 
-  __nv_bfloat16 xsum = 0.0;
+  __nv_bfloat16 xsum = __float2bfloat16(0.0);
 
 #pragma unroll
   for (auto j = 0; j < (INSS); j += 1)
     {
-      auto xinp = __nv_bfloat16(x[j]);
+      auto xinp = __float2bfloat16(x[j]);
        xsum += xinp;
 
     }
@@ -391,15 +391,15 @@ __nv_bfloat162 xsumx = __nv_bfloat162(xsum,xsum);
   for (int i = 0; i < 32; i+=1)
   {
 
-    __nv_bfloat162 xout = make_bfloat162(0.0, 0.0);
+    __nv_bfloat162 xout = make_bfloat162(__float2bfloat16(0.0),__float2bfloat16(0.0));
    
 
 #pragma unroll
     for (auto j = 0; j < (INSS); j += 1)
     {
       // asm("{fma.rn.bf16x2 %0,%1,%2,%3;\n}" : "=r"(*out) : "r"(__BFLOAT162_TO_CUI(a)), "r"(__BFLOAT162_TO_CUI(b)), "r"(__BFLOAT162_TO_CUI(c)));
-      auto nb = __nv_bfloat162(w[j], w[j + INPUTSIZE]);
-      auto xinp = __nv_bfloat162(x[j], x[j]);
+      auto nb = __float22bfloat162_rn(make_float2(w[j], w[j + INPUTSIZE]));
+      auto xinp = __float2bfloat162_rn(x[j]);
       asm("{fma.rn.bf16x2 %0,%1,%2,%3;\n}"
           : "=r"(__BFLOAT162_TO_CUI(xout)) : "r"(__BFLOAT162_TO_CUI(xinp)), "r"(__BFLOAT162_TO_CUI(nb)), "r"(__BFLOAT162_TO_CUI(xout)));
       // xsum += xinp;
