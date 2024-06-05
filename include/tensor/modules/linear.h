@@ -69,7 +69,7 @@ class Linear
         }
 
         void cuda(){
-            this->weight = this->weight.cuda(true);
+            this->weight = this->weight.cuda();
 
             if (this->quantized){
                 this->range = this->range.cuda();

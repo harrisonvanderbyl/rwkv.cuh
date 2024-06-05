@@ -3,7 +3,7 @@
 #include <cuda_runtime.h>
 #include "tensor/tensor.h"
 
-#define CUNORMTHREADS 64
+#define CUNORMTHREADS 32
 #define CUNORMBLOCKS 1
 
 __global__ void layernorm(float* input, float* output, float* weight, float* bias, size_t size, size_t lastshape, size_t headshape, float eps = 1e-5){
@@ -17,24 +17,22 @@ __global__ void layernorm(float* input, float* output, float* weight, float* bia
     input += start;
     output += start;
 
-    __shared__ float sum[CUNORMTHREADS];
-    __shared__ float sumsq[CUNORMTHREADS];
-    sum[thread] = 0.0f;
-    sumsq[thread] = 0.0f;
+    float sum = 0.0f;
+    float sumsq = 0.0f;
     for (size_t i = thread; i < headshape; i+=CUNORMTHREADS){
-        sum[thread] += input[i];
-        sumsq[thread] += input[i] * input[i];
+        sum += input[i];
+        sumsq += input[i] * input[i];
     }
-    __syncthreads();
-    if (thread == 0){
-        for (size_t i = 1; i < CUNORMTHREADS; i++){
-            sum[0] += sum[i];
-            sumsq[0] += sumsq[i];
-        }
+
+    for (int i = 1; i < warpSize; i *= 2)
+    {
+        sum += __shfl_xor_sync(-1, sum, i);
+        sumsq += __shfl_xor_sync(-1, sumsq, i);
     }
-    __syncthreads();
-    float mean = sum[0] / headshape;
-    float var = sumsq[0] / headshape - mean * mean;
+    
+   
+    float mean = sum / headshape;
+    float var = sumsq / headshape - mean * mean;
 
     float invstd = 1.0f / sqrt(var + eps);
 
