@@ -464,6 +464,19 @@ void matmul8_cuda_kernal(uint8_t *A, void *B, void *C, void *Ao, void *Ar, size_
     {
       kernelc_mm8_one<7168/jsplit><<<gridSize, blockSize>>>(
           INSHAPE, OUTSHAPE, (float *)B, A, (__nv_bfloat162 *)Ar, (__nv_bfloat162 *)Ao, (float *)C);
+    }else if (
+        INSHAPE == 4096)
+    {
+      kernelc_mm8_one<4096/jsplit><<<gridSize, blockSize>>>(
+          INSHAPE, OUTSHAPE, (float *)B, A, (__nv_bfloat162 *)Ar, (__nv_bfloat162 *)Ao, (float *)C);
+    }else if (
+      INSHAPE == 14336)
+  {
+    kernelc_mm8_one<14336/jsplit><<<gridSize, blockSize>>>(
+        INSHAPE, OUTSHAPE, (float *)B, A, (__nv_bfloat162 *)Ar, (__nv_bfloat162 *)Ao, (float *)C);
+  }
+    else{
+      std::cout << "Not supported " << INSHAPE;
     }
   }
   // max size 1024
