@@ -20,6 +20,25 @@
 
 #if !defined(__CUDACC__)
 
+
+#if defined(_WIN32) || defined(_WIN64)
+
+#define CUDAONLY(x) void x { throw std::runtime_error("Not compiled with cuda"); }
+#define CUDAONLYE(x) size_t __attribute__((weak)) x { throw std::runtime_error("Not compiled with cuda"); }
+
+void RcudaMemset(void *pointer, int value, size_t size)
+{
+    throw std::runtime_error("Not compiled with cuda");
+}
+void RcudaMemcpy(void *dst, void *src, size_t size, size_t type)
+{
+    throw std::runtime_error("Not compiled with cuda");
+}
+void RcudaMalloc(void **pointer, size_t size)
+{
+    throw std::runtime_error("Not compiled with cuda");
+}
+#else
 #define CUDAONLY(x) \
     void __attribute__((weak)) x { throw std::runtime_error("Not compiled with cuda"); }
 #define CUDAONLYE(x) \
@@ -37,6 +56,7 @@ void __attribute__((weak)) RcudaMalloc(void **pointer, size_t size)
 {
     throw std::runtime_error("Not compiled with cuda");
 }
+#endif
 
 size_t cudaMemcpyDeviceToHost;
 size_t cudaMemcpyHostToDevice;
