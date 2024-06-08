@@ -774,10 +774,18 @@ Tensor Tensor::cuda(bool transpose)
     check_for_errors();
 }
 #else
+
+#if defined(_WIN32) || defined(_WIN64)
+Tensor Tensor::cuda(bool transpose)
+{
+    throw std::runtime_error("Not compiled with cuda");
+}
+#else
 Tensor __attribute__((weak)) Tensor::cuda(bool transpose)
 {
     throw std::runtime_error("Not compiled with cuda");
 }
+#endif
 #endif
 
 #include "tensor/operators/ops.h"
