@@ -110,12 +110,12 @@ inline const float dot_uint8_floats(u_int8_t *input, float *other, size_t size)
         auto u16vec = vmovl_u8(vld1_u8(input + k));
         auto u32vec = vmovl_u16(vget_low_u16(u16vec));
         auto f32vec = vcvtq_f32_u32(u32vec);
-        zz1 = vfmaq_f32(zz1, f32vec, vld1q_f32(other + k));
+        zz1 = vmlaq_f32(zz1, f32vec, vld1q_f32(other + k));
 
         u32vec = vmovl_u16(vget_high_u16(u16vec));
         f32vec = vcvtq_f32_u32(u32vec);
 
-        zz1 = vfmaq_f32(zz1, f32vec, vld1q_f32(other + k + get_simd_width()));
+        zz1 = vmlaq_f32(zz1, f32vec, vld1q_f32(other + k + get_simd_width()));
 ;
     }
 
@@ -129,7 +129,7 @@ inline const float dot_floats(float *input, float *other, size_t size)
 
     for (auto k = 0; k < size; k += get_simd_width())
     {
-        zz1 = vfmaq_f32(zz1, vld1q_f32(input + k), vld1q_f32(other + k));
+        zz1 = vmlaq_f32(zz1, vld1q_f32(input + k), vld1q_f32(other + k));
     }
 
     return reduce_float(zz1);
@@ -152,8 +152,8 @@ inline const void simd_wkv(size_t B, size_t T,size_t H,size_t Z, size_t bb,size_
         {
             auto kv = vmulq_f32(vld1q_f32(k+j), vdupq_n_f32(v[i]));
             auto sss = vld1q_f32(s+i*Z+j);
-            acc = vfmaq_f32(acc, vfmaq_f32(sss,vld1q_f32(u+j) , kv),vld1q_f32(r+j));
-            vst1q_f32(s+i*Z+j, vfmaq_f32(kv,vld1q_f32(w+j),sss));
+            acc = vmlaq_f32(acc, vmlaq_f32(sss,vld1q_f32(u+j) , kv),vld1q_f32(r+j));
+            vst1q_f32(s+i*Z+j, vmlaq_f32(kv,vld1q_f32(w+j),sss));
 
         }
 
