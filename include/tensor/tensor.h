@@ -25,6 +25,7 @@
 
 #define CUDAONLY(x) void x { throw std::runtime_error("Not compiled with cuda"); }
 #define CUDAONLYE(x) size_t __attribute__((weak)) x { throw std::runtime_error("Not compiled with cuda"); }
+#define u_int8_t uchar
 
 void RcudaMemset(void *pointer, int value, size_t size)
 {
