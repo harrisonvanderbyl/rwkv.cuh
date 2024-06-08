@@ -31,7 +31,7 @@ void matmul8_cpu_kernal(uint8_t *A, void *B, void *C, void *Ao, void *Ar, size_t
                     {
                         auto zz1 = dot_uint8_floats(A + b*INSHAPE, BAINSHAPE, INSHAPE);
 
-                        (flp(C) + bbt * OUTSHAPE)[b] += ss2f * bflp(Ao)[b] + zz1 * bflp(Ar)[b];
+                        (flp(C) + bbt * OUTSHAPE)[b] += ss2f * float(bflp(Ao)[b]) + zz1 * float(bflp(Ar)[b]);
                     }
                 } },
             head);
