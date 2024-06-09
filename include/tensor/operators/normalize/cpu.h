@@ -11,7 +11,7 @@ void normalize_cpu_kernel(void *input, void *weight, void *bias, void *output, f
     size_t simdwidth = get_simd_width();
 
     size_t newheadshape = lastshape / threadpool->heads;
-    if (headshape % newheadshape != 0 and newheadshape % headshape != 0)
+    if (headshape % newheadshape != 0 && newheadshape % headshape != 0)
     {
         throw std::runtime_error("Headshape and threads must share common factor");
     }

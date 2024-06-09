@@ -74,7 +74,7 @@ void inline  simd_norm_assign(float *input, float mean, float vareps, float *wei
     _mm256_storeu_ps(output, _mm256_add_ps(_mm256_mul_ps(_mm256_div_ps(_mm256_sub_ps(_mm256_loadu_ps(input), _mm256_set1_ps(mean)), _mm256_set1_ps(vareps)), _mm256_loadu_ps(weight)), _mm256_loadu_ps(bias)));
 }
 
-float inline  dot_uint8_floats(u_int8_t *input, float *other, size_t size)
+float inline  dot_uint8_floats(uint8_t *input, float *other, size_t size)
 {
     auto zz1 = _mm256_setzero_ps();
 
@@ -113,7 +113,7 @@ void inline  simd_wkv(size_t B, size_t T,size_t H,size_t Z, size_t bb,size_t tt,
         auto acc = _mm256_setzero_ps();
         for (size_t j = 0; j < Z; j+=8)
         {
-            auto kv = _mm256_loadu_ps(k+j) * v[i];
+            auto kv = _mm256_mul_ps(_mm256_loadu_ps(k+j) , _mm256_set1_ps(v[i]));
             auto sss = _mm256_loadu_ps(s+i*Z+j);
             acc = _mm256_fmadd_ps(_mm256_fmadd_ps(kv,_mm256_loadu_ps(u+j) , sss),_mm256_loadu_ps(r+j),acc);
             _mm256_store_ps(s+i*Z+j, _mm256_fmadd_ps(sss,_mm256_loadu_ps(w+j),kv));

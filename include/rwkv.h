@@ -229,7 +229,12 @@ public:
 
 
 static ThreadPool* threadpool = nullptr;
-ThreadPool* __attribute__((weak)) get_threadpool(size_t threadsNum, bool debug){
+#ifdef _WIN32
+#define WEAK
+#else
+#define WEAK __attribute__((weak))
+#endif
+ThreadPool* WEAK get_threadpool(size_t threadsNum, bool debug){
     if (threadpool == nullptr)
     {
         if (threadsNum == 0)
