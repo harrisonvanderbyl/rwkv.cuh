@@ -60,7 +60,7 @@ void __attribute__((weak)) simd_norm_assign(float *input, float mean, float vare
     (*output = ((((*(input)- (mean))/ (vareps)) * *(weight)) + *(bias)));
 }
 
-float __attribute__((weak)) dot_uint8_floats(u_int8_t *input, float *other, size_t size)
+float __attribute__((weak)) dot_uint8_floats(uint8_t *input, float *other, size_t size)
 {
     auto zz1 = 0.0;
 

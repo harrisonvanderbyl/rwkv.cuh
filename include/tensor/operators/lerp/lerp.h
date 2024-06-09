@@ -45,7 +45,7 @@ inline Tensor Tensor::shift(Tensor& input, Tensor& output, Tensor& state, size_t
                             auto startofoutput = outputdata + j*btc + k*seq*dims + l*dims + i*headsize;
                             auto startofmixin = l != 0 ? inputdata + k*seq*dims + (l-1)*dims + i*headsize : statedata + k*dims + i*headsize;
                             lerp_cpu_kernel(startofmix, startofmixin,startofinput,  startofoutput, headsize, headsize, kFLOAT_32);
-                            if (l == seq-1 & j == outputchannels-1){
+                            if (l == seq-1 && j == outputchannels-1){
                                 // copy the last output to the state
                                 memcpy(statedata + k*dims + i*headsize, startofinput, headsize*sizeof(float));
                             }
