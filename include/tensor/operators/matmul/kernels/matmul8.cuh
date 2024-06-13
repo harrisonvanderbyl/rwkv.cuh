@@ -459,10 +459,19 @@ void matmul8_cuda_kernal(uint8_t *A, void *B, void *C, void *Ao, void *Ar, size_
       kernelc_mm8_one<2048/jsplit><<<gridSize, blockSize>>>(
           INSHAPE, OUTSHAPE, (float *)B, A, (__nv_bfloat162 *)Ar, (__nv_bfloat162 *)Ao, (float *)C);
     }
-    if (INSHAPE == 2560)
+    else if (INSHAPE == 2560)
     {
-      kernelc_mm8_one<2560/jsplit><<<gridSize, blockSize>>>(
-          INSHAPE, OUTSHAPE, (float *)B, A, (__nv_bfloat162 *)Ar, (__nv_bfloat162 *)Ao, (float *)C);
+      // kernelc_mm8_one<2560/jsplit><<<gridSize, blockSize>>>(
+      //     INSHAPE, OUTSHAPE, (float *)B, A, (__nv_bfloat162 *)Ar, (__nv_bfloat162 *)Ao, (float *)C);
+       runSgemmWarptiling8(BBT, OUTSHAPE, INSHAPE, (float *)B, (uint8_t *)A, (bfloat1624 *)Ar, (bfloat1624 *)Ao, (float *)C);
+  
+    }
+    else if (INSHAPE == 8960)
+    {
+      // kernelc_mm8_one<8960/jsplit><<<gridSize, blockSize>>>(
+      //     INSHAPE, OUTSHAPE, (float *)B, A, (__nv_bfloat162 *)Ar, (__nv_bfloat162 *)Ao, (float *)C);
+       runSgemmWarptiling8(BBT, OUTSHAPE, INSHAPE, (float *)B, (uint8_t *)A, (bfloat1624 *)Ar, (bfloat1624 *)Ao, (float *)C);
+  
     }
     else if (
         INSHAPE == 7168)
