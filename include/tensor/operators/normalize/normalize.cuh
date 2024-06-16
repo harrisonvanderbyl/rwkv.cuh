@@ -26,8 +26,8 @@ __global__ void layernorm(float* input, float* output, float* weight, float* bia
 
     for (int i = 1; i < warpSize; i *= 2)
     {
-        sum += __shfl_xor_sync(-1, sum, i);
-        sumsq += __shfl_xor_sync(-1, sumsq, i);
+        sum += __shfl_xor_sync(0xffffffff, sum, i);
+        sumsq += __shfl_xor_sync(0xffffffff, sumsq, i);
     }
     
    

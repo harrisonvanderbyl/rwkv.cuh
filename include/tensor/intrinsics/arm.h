@@ -78,13 +78,14 @@ float reduce_float(float32x4_t xx)
     return v3[0] + v3[1] + v3[2] + v3[3];
 }
 
-void simd_lerp(float *input, float *other, float *weight, float *output)
+void simd_lerp(float *input, float *other, float *weighti, float *output)
 {
     // arm neon
+    auto weight = vaddq_f32(vld1q_f32(weight),vld1q_f32(output));
     float32x4_t v1 = vld1q_f32(input);
-    float32x4_t v2 = vsubq_f32(vdupq_n_f32(1.0f), vld1q_f32(weight));
+    float32x4_t v2 = vsubq_f32(vdupq_n_f32(1.0f), weight);
     float32x4_t v3 = vmulq_f32(v1, v2);
-    float32x4_t v4 = vmulq_f32(vld1q_f32(other), vld1q_f32(weight));
+    float32x4_t v4 = vmulq_f32(vld1q_f32(other), weight);
     float32x4_t v5 = vaddq_f32(v3, v4);
     vst1q_f32(output, v5);
 }
@@ -97,6 +98,13 @@ void simd_norm_assign(float *input, float mean, float vareps, float *weight, flo
     float32x4_t v4 = vmulq_f32(v3, vld1q_f32(weight));
     float32x4_t v5 = vaddq_f32(v4, vld1q_f32(bias));
     vst1q_f32(output, v5);
+}
+
+void simd_tanh(float* input){
+    auto x = vld1q_f32(input);
+    auto ax = arm_exp(x);
+    auto bx = arm_exp(vnegq_f32(x));
+    vst1q(input, vdivq_f32(vsubq_f32(ax,bx),vaddq_f32(ax,bx)));
 }
 
 
@@ -143,7 +151,7 @@ inline const void simd_wkv(size_t B, size_t T,size_t H,size_t Z, size_t bb,size_
     auto y = yy + bb*T*H*Z + tt*H*Z + hh*Z;
     auto s = ss + bb*H*Z*Z + hh*Z*Z;
     auto u = uu + hh*Z;
-    auto w = ww + hh*Z;
+    auto w = ww + bb*T*H*Z + tt*H*Z + hh*Z;
 
     for (size_t i = 0; i < Z; i++)
     {
@@ -153,7 +161,7 @@ inline const void simd_wkv(size_t B, size_t T,size_t H,size_t Z, size_t bb,size_
             auto kv = vmulq_f32(vld1q_f32(k+j), vdupq_n_f32(v[i]));
             auto sss = vld1q_f32(s+i*Z+j);
             acc = vmlaq_f32(acc, vmlaq_f32(sss,vld1q_f32(u+j) , kv),vld1q_f32(r+j));
-            vst1q_f32(s+i*Z+j, vmlaq_f32(kv,vld1q_f32(w+j),sss));
+            vst1q_f32(s+i*Z+j, vmlaq_f32(kv,arm_exp(vnegq_f32(arm_exp((vld1q_f32(w+j))))),sss));
 
         }
 

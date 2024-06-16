@@ -20,26 +20,6 @@
 
 #if !defined(__CUDACC__)
 
-
-#if defined(_WIN32) || defined(_WIN64)
-
-#define CUDAONLY(x) void x { throw std::runtime_error("Not compiled with cuda"); }
-#define CUDAONLYE(x) size_t __attribute__((weak)) x { throw std::runtime_error("Not compiled with cuda"); }
-#define u_int8_t uchar
-
-void RcudaMemset(void *pointer, int value, size_t size)
-{
-    throw std::runtime_error("Not compiled with cuda");
-}
-void RcudaMemcpy(void *dst, void *src, size_t size, size_t type)
-{
-    throw std::runtime_error("Not compiled with cuda");
-}
-void RcudaMalloc(void **pointer, size_t size)
-{
-    throw std::runtime_error("Not compiled with cuda");
-}
-#else
 #define CUDAONLY(x) \
     void __attribute__((weak)) x { throw std::runtime_error("Not compiled with cuda"); }
 #define CUDAONLYE(x) \
@@ -57,7 +37,6 @@ void __attribute__((weak)) RcudaMalloc(void **pointer, size_t size)
 {
     throw std::runtime_error("Not compiled with cuda");
 }
-#endif
 
 size_t cudaMemcpyDeviceToHost;
 size_t cudaMemcpyHostToDevice;
@@ -178,6 +157,11 @@ struct bfloat16
     // bfloat16 operator = (uint16_t value) {this->value = value; return *this;}
     // bfloat16 operator = (double value) {this->value = float32_to_bfloat16((float)value); return *this;}
     bfloat16 operator+(bfloat16 valuein) { return bfloat16(float(*this) + float(valuein)); }
+    bfloat16 operator+=(bfloat16 valuein)
+    {
+        *this = *this + valuein;
+        return *this;
+    }
 };
 
 static float bfloat16_to_float32(bfloat16 value)
@@ -640,12 +624,13 @@ struct Tensor
 
     Tensor relusquared();
     Tensor &sigmoidmul(Tensor &other, Tensor &residual, Tensor &output);
-    Tensor shift(Tensor &input, Tensor &output, Tensor &state, size_t indims);
+    Tensor shift(Tensor &input, Tensor &output, Tensor &state, size_t indims, bool initiate_move = false);
     Tensor swishmul(Tensor &other);
     Tensor matmul(Tensor &other, Tensor residual = Tensor());
     Tensor matmul(Tensor &Art, Tensor &Aot, Tensor &Bt, Tensor residual = Tensor());
     Tensor normalize(const Tensor &weight, const Tensor &bias, const Tensor &result, size_t heads = 1, float epsilon = 1e-5);
 
+    Tensor& tanh();
     Tensor wkv5(Tensor &r, Tensor &k, Tensor &v, Tensor &w, Tensor &u, Tensor &y);
 
     Tensor operator[](size_t index);
@@ -739,7 +724,7 @@ Tensor Tensor::cuda(bool transpose)
     }
     else
     {
-        if (data == nullptr)
+        if (data == nullptr || data_size_in_bytes == 0)
         {
             return Tensor(shape, nullptr, dtype, DEVICE::CUDA, device_id);
         }
@@ -775,18 +760,10 @@ Tensor Tensor::cuda(bool transpose)
     check_for_errors();
 }
 #else
-
-#if defined(_WIN32) || defined(_WIN64)
-Tensor Tensor::cuda(bool transpose)
-{
-    throw std::runtime_error("Not compiled with cuda");
-}
-#else
 Tensor __attribute__((weak)) Tensor::cuda(bool transpose)
 {
     throw std::runtime_error("Not compiled with cuda");
 }
-#endif
 #endif
 
 #include "tensor/operators/ops.h"

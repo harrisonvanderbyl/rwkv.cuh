@@ -1,6 +1,7 @@
 #ifndef SIMD_AVX512_H
 #define SIMD_AVX512_H
 #include "tensor/intrinsics/shared.h"
+#include "stdint.h"
 
 #include <cmath>
 
@@ -60,6 +61,13 @@ void __attribute__((weak)) simd_norm_assign(float *input, float mean, float vare
     (*output = ((((*(input)- (mean))/ (vareps)) * *(weight)) + *(bias)));
 }
 
+void __attribute__((weak)) simd_tanh(float* input){
+    auto x = *(input);
+    auto ax = exp(x);
+    auto bx = exp(-(x));
+    (*input = ((ax-bx)/(ax+bx)));
+}
+
 float __attribute__((weak)) dot_uint8_floats(uint8_t *input, float *other, size_t size)
 {
     auto zz1 = 0.0;
@@ -92,7 +100,7 @@ void __attribute__((weak)) simd_wkv(size_t B, size_t T,size_t H,size_t Z, size_t
     auto y = yy + bb*T*H*Z + tt*H*Z + hh*Z;
     auto s = ss + bb*H*Z*Z + hh*Z*Z;
     auto u = uu + hh*Z;
-    auto w = ww + hh*Z;
+    auto w = ww + bb*T*H*Z + tt*H*Z + hh*Z;
 
     for (size_t i = 0; i < Z; i++)
     {
@@ -102,7 +110,7 @@ void __attribute__((weak)) simd_wkv(size_t B, size_t T,size_t H,size_t Z, size_t
             auto kv = *(k+j) * v[i];
             auto sss = *(s+i*Z+j);
             acc = ((kv * *(u+j) + sss)**(r+j)+acc);
-            (*(s+i*Z+j) =  (sss**(w+j)+kv));
+            (*(s+i*Z+j) =  (sss*simdexpfallback(exp(*(w+j)))+kv));
 
         }
 

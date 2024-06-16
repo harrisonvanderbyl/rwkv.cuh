@@ -19,20 +19,26 @@ size_t get_simd_width()
 __m256 simdexp256(__m256 xx)
 {
     auto x = flp(&xx);
-    return _mm256_set_ps(exp(-x[7]), exp(-x[6]), exp(-x[5]), exp(-x[4]), exp(-x[3]), exp(-x[2]), exp(-x[1]), exp(-x[0]));
+    return _mm256_set_ps(exp(x[7]), exp(x[6]), exp(x[5]), exp(x[4]), exp(x[3]), exp(x[2]), exp(x[1]), exp(x[0]));
 }
+
 
 #else
 
-__m256 simdexp256(__m256 xx)
+
+__m256 simdexp(__m256 xx)
 {
-    return _mm256_exp_ps(-xx);
+    return _mm256_exp_ps(xx);
 }
 #endif
 
+__m256 simdneg(__m256 xx){
+    return _mm256_mul_ps(xx,_mm256_set1_ps(-1));
+}
+
 void inline  simd_sigmoidmul(float *input, float *other, float *residual, float *output)
 {
-    _mm256_storeu_ps(output, _mm256_add_ps(_mm256_div_ps(_mm256_loadu_ps(other), _mm256_add_ps(_mm256_set1_ps(1.0f), simdexp256((_mm256_loadu_ps(input))))), _mm256_loadu_ps(residual)));
+    _mm256_storeu_ps(output, _mm256_add_ps(_mm256_div_ps(_mm256_loadu_ps(other), _mm256_add_ps(_mm256_set1_ps(1.0f), simdexp256(simdneg((_mm256_loadu_ps(input)))))), _mm256_loadu_ps(residual)));
 }
 
 float inline  reduce_float(__m256 xx)
@@ -43,7 +49,7 @@ float inline  reduce_float(__m256 xx)
 
 void inline  simd_swishmul(float *input, float *other, float *output)
 {
-    _mm256_storeu_ps(output, _mm256_div_ps(_mm256_mul_ps(*(__m256 *)other, *(__m256 *)input), _mm256_add_ps(_mm256_set1_ps(1.0f), simdexp256(*(__m256 *)input))));
+    _mm256_storeu_ps(output, _mm256_div_ps(_mm256_mul_ps(*(__m256 *)other, *(__m256 *)input), _mm256_add_ps(_mm256_set1_ps(1.0f), simdexp256(simdneg(*(__m256 *)input)))));
 }
 
 void inline  simd_relusquare(float *input, float *output)
@@ -64,9 +70,10 @@ float inline  simd_variance_acc(float *input, float mean)
     return reduce_float(v3);
 }
 
-void inline  simd_lerp(float *input, float *other, float *weight, float *output)
+void inline simd_lerp(float *input, float *other, float *weighti, float *output)
 {
-    _mm256_storeu_ps(output, _mm256_add_ps(_mm256_mul_ps(_mm256_loadu_ps(input), _mm256_sub_ps(_mm256_set1_ps(1.0f), _mm256_loadu_ps(weight))), _mm256_mul_ps(_mm256_loadu_ps(other), _mm256_loadu_ps(weight))));
+    auto weight = _mm256_add_ps(_mm256_loadu_ps(weighti),_mm256_loadu_ps(output));
+    _mm256_storeu_ps(output, _mm256_add_ps(_mm256_mul_ps(_mm256_loadu_ps(input), _mm256_sub_ps(_mm256_set1_ps(1.0f), weight)), _mm256_mul_ps(_mm256_loadu_ps(other), weight)));
 }
 
 void inline  simd_norm_assign(float *input, float mean, float vareps, float *weight, float *bias, float *output)
@@ -98,6 +105,15 @@ float inline  dot_floats(float *input, float *other, size_t size)
     return reduce_float(zz1);
 }
 
+
+void simd_tanh(float* input){
+    auto x = _mm256_loadu_ps(input);
+    auto ax = simdexp256(x);
+    auto bx = simdexp256(simdneg(x));
+    _mm256_storeu_ps(input, _mm256_div_ps(_mm256_sub_ps(ax,bx),_mm256_add_ps(ax,bx)));
+}
+
+
 void inline  simd_wkv(size_t B, size_t T,size_t H,size_t Z, size_t bb,size_t tt, size_t hh, float *vv, float *ss, float *kk, float *uu, float *ww, float *rr, float *yy)
 {
     auto k = kk + bb*T*H*Z + tt*H*Z + hh*Z;
@@ -106,7 +122,7 @@ void inline  simd_wkv(size_t B, size_t T,size_t H,size_t Z, size_t bb,size_t tt,
     auto y = yy + bb*T*H*Z + tt*H*Z + hh*Z;
     auto s = ss + bb*H*Z*Z + hh*Z*Z;
     auto u = uu + hh*Z;
-    auto w = ww + hh*Z;
+    auto w = ww + bb*T*H*Z + tt*H*Z + hh*Z;
 
     for (size_t i = 0; i < Z; i++)
     {
@@ -116,7 +132,7 @@ void inline  simd_wkv(size_t B, size_t T,size_t H,size_t Z, size_t bb,size_t tt,
             auto kv = _mm256_mul_ps(_mm256_loadu_ps(k+j) , _mm256_set1_ps(v[i]));
             auto sss = _mm256_loadu_ps(s+i*Z+j);
             acc = _mm256_fmadd_ps(_mm256_fmadd_ps(kv,_mm256_loadu_ps(u+j) , sss),_mm256_loadu_ps(r+j),acc);
-            _mm256_store_ps(s+i*Z+j, _mm256_fmadd_ps(sss,_mm256_loadu_ps(w+j),kv));
+            _mm256_store_ps(s+i*Z+j, _mm256_fmadd_ps(sss, simdexp256(simdneg(simdexp256(_mm256_loadu_ps(w+j)))),kv));
 
         }
 

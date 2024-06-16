@@ -67,8 +67,11 @@ public:
 
     Tensor operator()(std::vector<std::vector<size_t>> input)
     {
+
+        auto pool = get_threadpool(); 
         auto rx = emb1(input);
         auto x = ln0(rx);
+        pool->debug(x,"ln0");
 
         for (size_t i = 0; i < layers; i++)
         {
@@ -76,7 +79,6 @@ public:
         }
         auto xm = ln_out(x);
         check_for_errors();
-        auto pool = get_threadpool(); 
         pool->sync();
         // xm = xm.cpu();
         auto out = output(xm);
@@ -209,9 +211,13 @@ public:
             blocks[i].att.ln_x.cuda();
             blocks[i].attshift.cuda();
             blocks[i].ffnshift.cuda();
-            blocks[i].att.time_decay = blocks[i].att.time_decay.cuda();
             blocks[i].att.time_faaaa = blocks[i].att.time_faaaa.cuda();
             blocks[i].att.state = blocks[i].att.state.cuda();
+            blocks[i].attshift.time_maa_w1.cuda();
+            blocks[i].attshift.time_maa_w2.cuda();
+            blocks[i].attshift.time_mix_x = blocks[i].attshift.time_mix_x.cuda();
+            blocks[i].att.w1.cuda();
+            blocks[i].att.w2.cuda();
 
             blocks[i].ffn.key.cuda();
             blocks[i].ffn.value.cuda();

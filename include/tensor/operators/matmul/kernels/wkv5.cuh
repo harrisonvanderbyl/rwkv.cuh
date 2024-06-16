@@ -42,7 +42,7 @@ __global__ void wkvatt(size_t TT, size_t CH, float *kk, float *vv, float *rr, fl
             float kkk = float(kk[iind]);
             float uuu = float(uu[hoffseti]);
             float rrr = float(rr[iind]);
-            float www = float(ww[hoffseti]);
+            float www = exp(-exp(double(ww[iind])));
 
             uint32_t jind = bhofseti + j;
             uint32_t sind = bbhhofseti + j;

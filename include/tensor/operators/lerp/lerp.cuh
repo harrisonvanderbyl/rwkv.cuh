@@ -1,7 +1,7 @@
 #ifndef __LERP_CU__
 #define __LERP_CU__
 
-__global__ void lerp_kernel(float *inputdata, float *outputdata, float *mixdata, size_t dims, size_t outputchannels, size_t seq, size_t batches, size_t headsize, float *statedata)
+__global__ void lerp_kernel(float *inputdata, float *outputdata, float *mixdata, size_t dims, size_t outputchannels, size_t seq, size_t batches, size_t headsize, float *statedata, bool initiate_move)
 {
     auto k = blockIdx.x;
     auto j = blockIdx.y;
@@ -18,9 +18,9 @@ __global__ void lerp_kernel(float *inputdata, float *outputdata, float *mixdata,
         auto startofmixin = l != 0 ? inputdata + k * seq * dims + (l - 1) * dims + i * headsize : statedata + k * dims + i * headsize;
         for (size_t m = 0; m < headsize; m += 1)
         {
-            startofoutput[m] = startofinput[m] * startofmix[m] + startofmixin[m] * (1.0f - startofmix[m]);
+            startofoutput[m] = startofmixin[m] * (startofmix[m]+startofoutput[m]) + startofinput[m] * (1.0f - (startofmix[m]+startofoutput[m]));
         }
-        if (l == seq - 1 & j == outputchannels - 1)
+        if (l == seq - 1 && j == outputchannels - 1 && initiate_move)
         {
             // copy the last output to the state
             for (size_t m = 0; m < headsize; m += 1)
@@ -32,7 +32,7 @@ __global__ void lerp_kernel(float *inputdata, float *outputdata, float *mixdata,
     }
 }
 
-void lerp_cuda_kernel(void *inputdata, void *outputdata, void *mixdata, size_t dims, size_t outputchannels, size_t seq, size_t batches, void *statedata, TENSORTYPE dtype)
+void lerp_cuda_kernel(void *inputdata, void *outputdata, void *mixdata, size_t dims, size_t outputchannels, size_t seq, size_t batches, void *statedata, TENSORTYPE dtype, bool initiate_move)
 {
 
     auto blocks = dim3(batches, outputchannels, 1);
@@ -42,7 +42,7 @@ void lerp_cuda_kernel(void *inputdata, void *outputdata, void *mixdata, size_t d
 
     if (dtype == TENSORTYPE::kFLOAT_32)
     {
-        lerp_kernel<<<blocks, threads>>>((float *)inputdata, (float *)outputdata, (float *)mixdata, dims, outputchannels, seq, batches, headsize, (float *)statedata);
+        lerp_kernel<<<blocks, threads>>>((float *)inputdata, (float *)outputdata, (float *)mixdata, dims, outputchannels, seq, batches, headsize, (float *)statedata, initiate_move);
     }
     else
     {

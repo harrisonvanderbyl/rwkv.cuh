@@ -9,7 +9,6 @@ class Attention
     public:
         uint32_t head_size = 64;
         uint32_t n_head; 
-        Tensor time_decay;
         Tensor time_faaaa;
         Tensor state;
         Linear receptance;
@@ -19,6 +18,8 @@ class Attention
         Linear output;
         LayerNorm ln_x;
         Tensor buffer;
+        Linear w1;
+        Linear w2;
         int layer = 0;
 
         Attention(){
@@ -34,7 +35,6 @@ class Attention
             this->n_head = dims/this->head_size;
             this->state = Tensor({batch_size, this->n_head , this->head_size, this->head_size});
             
-            this->time_decay = model[prefix + "time_decay"];
             this->time_faaaa = model[prefix + "time_faaaa"];
             
 
@@ -44,6 +44,9 @@ class Attention
             this->gate = Linear(model, prefix + "gate");
             this->output = Linear(model, prefix + "output");
             this->ln_x = LayerNorm(model[prefix + "ln_x.weight"], model[prefix + "ln_x.bias"], n_head, 64e-5);
+
+            this->w1 = Linear(model, prefix + "w1");
+            this->w2 = Linear(model, prefix + "w2");
             
         }
 
@@ -60,12 +63,23 @@ class Attention
             
             auto pool = get_threadpool();
             pool->sync();
-            pool->debug(input[0], "mix k");
-            pool->debug(input[1], "mix r");
+            auto ww = this->w1(input[0]);
+
+            pool->sync();
+
+            auto www = ww.tanh();
+            pool->sync();
+
+            auto w = this->w2(www);
+            pool->debug(w, "time_decay");
+
+            pool->sync();
+            pool->debug(input[1], "mix k");
+            pool->debug(input[3], "mix r");
             pool->debug(input[2], "mix v");
 
-            auto k = this->key(input[0]);
-            auto r = this->receptance(input[1]);
+            auto k = this->key(input[1]);
+            auto r = this->receptance(input[3]);
             auto v = this->value(input[2]);
 
             pool->debug(k, "start k");
@@ -73,7 +87,7 @@ class Attention
             pool->debug(r, "start r");
             
             check_for_errors();
-            auto xm = this->state.wkv5(r,k,v,this->time_decay,this->time_faaaa, cbuf);
+            auto xm = this->state.wkv5(r,k,v,w,this->time_faaaa, cbuf);
             pool->debug(xm, "start xm");
             
             check_for_errors();
@@ -82,7 +96,7 @@ class Attention
             pool->debug(xxa, "start xxa");
             
             check_for_errors();
-            auto gv = this->gate(input[3]);
+            auto gv = this->gate(input[4]);
             pool->debug(gv, "start gv");
 
             check_for_errors();
@@ -96,6 +110,7 @@ class Attention
             pool->debug(out, "start out");
 
             check_for_errors();
+            
 
             return out;
         }

@@ -38,29 +38,45 @@ void matmul8_cpu_kernal(uint8_t *A, void *B, void *C, void *Ao, void *Ar, size_t
     }
 }
 
-void matmul_cpu_kernal(void *A, void *B, void *C, size_t BBT, size_t INSHAPE, size_t OUTSHAPE, TENSORTYPE dtype)
+void matmul_cpu_kernal(void *A, void *B, void *C, size_t BBT, size_t INSHAPE, size_t OUTSHAPE, TENSORTYPE dtype, size_t bmmshape)
 {
     ThreadPool *pool = get_threadpool();
 
-    auto headsize = OUTSHAPE / pool->heads;
-    for (size_t head = 0; head < pool->heads; head++)
+    // std::cout << INSHAPE<<"<in->out>" << OUTSHAPE << "\n";
+    
+
+    auto headsize = (OUTSHAPE) / pool->heads;
+    auto headsnum = pool->heads;
+
+    if(headsize%get_simd_width()){
+        headsnum = OUTSHAPE / get_simd_width();
+        headsize = get_simd_width();
+    }
+    // assert((headsize%get_simd_width()) == 0); // use different thread counts, try a different amount of threads, ie 4 for 1b5 should work
+    for (size_t head = 0; head < headsnum; head++)
     {
         pool->add_job(
-            [A, B, C, BBT, INSHAPE, OUTSHAPE, headsize, head]()
+            [A, B, C, BBT, INSHAPE, OUTSHAPE, headsize, head, bmmshape]()
             {
                 for (size_t bbt = 0; bbt < BBT; bbt += 1)
                 {
+                    for (size_t bmmindex = 0; bmmindex < bmmshape; bmmindex += 1){
 
-                    const auto BAINSHAPE = flp(B) + bbt * INSHAPE;
+                    const auto BAINSHAPE = flp(B) + bbt * (INSHAPE*bmmshape) + bmmindex * INSHAPE;
 
                     for (size_t b = head*headsize; b < (head + 1)*headsize; b += 1)
                     {
-                        auto zz1 = dot_floats(flp(A) + b*INSHAPE, BAINSHAPE, INSHAPE);
+                        auto zz1 = dot_floats(flp(A) + b*INSHAPE + bmmindex * INSHAPE*OUTSHAPE, BAINSHAPE, INSHAPE);
 
-                        (flp(C) + bbt * OUTSHAPE)[b] +=  zz1;
+                        (flp(C) + bmmindex * BBT * OUTSHAPE + bbt * OUTSHAPE)[b] +=  zz1;
+                    }
                     }
                 } },
             head);
+    }
+
+    if(headsnum!=pool->heads){
+        pool->sync();
     }
 }
 

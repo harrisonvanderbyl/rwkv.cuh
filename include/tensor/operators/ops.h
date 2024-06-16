@@ -6,6 +6,7 @@
 #include "tensor/operators/normalize/normalize.h"
 #include "tensor/operators/relusquare/relusquare.h"
 #include "tensor/operators/sigmoidmul/sigmoidmul.h"
+#include "tensor/operators/tanh/tanh.h"
 #include "tensor/operators/lerp/lerp.h"
 #include "tensor/operators/swishmul/swishmul.h"
 #include "tensor/operators/matmul/matmul8.h"
@@ -13,6 +14,7 @@
 #if defined(__CUDACC__)
 #include "tensor/operators/swishmul/swishmul.cuh"
 #include "tensor/operators/sigmoidmul/sigmoidmul.cuh"
+#include "tensor/operators/tanh/tanh.cuh"
 #include "tensor/operators/relusquare/relusquare.cuh"
 #include "tensor/operators/normalize/normalize.cuh"
 #include "tensor/operators/lerp/lerp.cuh"
@@ -20,6 +22,7 @@
 #else
 #include "tensor/operators/sigmoidmul/cpu.h"
 #include "tensor/operators/swishmul/cpu.h"
+#include "tensor/operators/tanh/cpu.h"
 #include "tensor/operators/relusquare/cpu.h"
 #include "tensor/operators/normalize/cpu.h"
 #include "tensor/operators/lerp/cpu.h"

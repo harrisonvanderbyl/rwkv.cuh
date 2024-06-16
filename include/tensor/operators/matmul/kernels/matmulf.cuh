@@ -5,83 +5,163 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cuda_runtime.h>
-
 #include "tensor/operators/matmul/kernels/globals.cuh"
+#include <cuda_bf16.h>
+#include <cuda_fp16.h>
+// uint8
 
+#define BN 32U
+#define BN4 8U
+#define BM 32U
+#define BM4 8U
+#define BK 16U
+#define BK4 4U
+#define WN 32U
+#define WN4 8U
+#define WM 32U
+#define WM4 8U
+#define WNITER 1U
+#define TN 4U
+#define TN4 1U
+#define TM 4U
+#define TM4 1U
+#define NUM_THREADS (BN / WN) * (BM / WM) * 32
+#define rowStrideA (NUM_THREADS * 4) / BK
+#define rowStrideB NUM_THREADS / (BN4)
+#define WMITER ((WM * WN) / (32 * TM * TN * WNITER))
 
-namespace wt {
-template <const int BM, const int BN, const int BK, const int rowStrideA,
-          const int rowStrideB>
-__device__ void loadFromGmem(int N, int K, const float *A, const float *B,
-                             float *As, float *Bs, int innerRowA, int innerColA,
-                             int innerRowB, int innerColB) {
-  for (uint offset = 0; offset + rowStrideA <= BM; offset += rowStrideA) {
-    const float4 tmp = reinterpret_cast<const float4 *>(
-        &A[(innerRowA + offset) * K + innerColA * 4])[0];
-    // float4 tmp;
-    // asm("ld.global.nc.v4.f32 {%0, %1, %2, %3}, [%4];"
-    //     : "=f"(tmp.x), "=f"(tmp.y), "=f"(tmp.z), "=f"(tmp.w)
-    //     : "l"(&A[(innerRowA + offset) * K + innerColA * 4]));
-    As[(innerColA * 4 + 0) * BM + innerRowA + offset] = tmp.x;
-    As[(innerColA * 4 + 1) * BM + innerRowA + offset] = tmp.y;
-    As[(innerColA * 4 + 2) * BM + innerRowA + offset] = tmp.z;
-    As[(innerColA * 4 + 3) * BM + innerRowA + offset] = tmp.w;
-  }
+#define WSUBM WM / WMITER   // 64/2=32
+#define WSUBN4 WN4 / WNITER // 16/2=8
+#define WSUBN WN / WNITER   // 32/2=16
+#define WSUBM4 WM4 / WMITER // 8/2=4
+// const int WARPSIZE = 32; // warpSize is not constexpr
 
-  for (uint offset = 0; offset + rowStrideB <= BK; offset += rowStrideB) {
-    reinterpret_cast<float4 *>(
-        &Bs[(innerRowB + offset) * BN + innerColB * 4])[0] =
-        reinterpret_cast<const float4 *>(
-            &B[(innerRowB + offset) * N + innerColB * 4])[0];
-    // asm("ld.global.v4.f32 {%0, %1, %2, %3}, [%4];"
-    //     : "=f"(Bs[(innerRowB + offset) * BN + innerColB * 4 + 0]),
-    //       "=f"(Bs[(innerRowB + offset) * BN + innerColB * 4 + 1]),
-    //       "=f"(Bs[(innerRowB + offset) * BN + innerColB * 4 + 2]),
-    //       "=f"(Bs[(innerRowB + offset) * BN + innerColB * 4 + 3])
-    //     : "l"(&B[(innerRowB + offset) * N + innerColB * 4]));
-  }
-}
+struct bfloat1624
+{
+  __nv_bfloat162 x = __float2bfloat162_rn(0.0f);
+  __nv_bfloat162 y = __float2bfloat162_rn(0.0f);
+};
 
-template <const int BM, const int BN, const int BK, const int WM, const int WN,
-          const int WMITER, const int WNITER, const int WSUBM, const int WSUBN,
-          const int TM, const int TN>
-__device__ void
-processFromSmem(float *regM, float *regN, float *threadResults, const float *As,
-                const float *Bs, const uint warpRow, const uint warpCol,
-                const uint threadRowInWarp, const uint threadColInWarp) {
-  for (uint dotIdx = 0; dotIdx < BK; ++dotIdx) {
-    // populate registers for whole warptile
-    for (uint wSubRowIdx = 0; wSubRowIdx < WMITER; ++wSubRowIdx) {
-      for (uint i = 0; i < TM; ++i) {
-        regM[wSubRowIdx * TM + i] =
-            As[(dotIdx * BM) + warpRow * WM + wSubRowIdx * WSUBM +
-               threadRowInWarp * TM + i];
+// __fmaf_rn((a.x), (b.x), (c.x)), __fmaf_rn((a.y), (b.y), (c.y)), __fmaf_rn((a.z), (b.z), (c.z)), __fmaf_rn((a.w), (b.w), (c.w)) \
+
+#define bf16fma(a, b, c) asm("{fma.rn.bf16x2 %0,%1,%2,%3;\n}" : "=r"(*c) : "r"(__BFLOAT162_TO_CUI(a)), "r"(__BFLOAT162_TO_CUI(b)), "r"(*c));
+#define bf16fmaout(a, b, c, out) asm("{fma.rn.bf16x2 %0,%1,%2,%3;\n}" : "=r"(*out) : "r"(__BFLOAT162_TO_CUI(a)), "r"(__BFLOAT162_TO_CUI(b)), "r"(__BFLOAT162_TO_CUI(c)));
+
+#define UFMAF(a, b, c, d)                                                   \
+  bf16fmaout(__floats2bfloat162_rn(float(a.x), float(a.y)), b.x, c.x, (d)); \
+  bf16fmaout(__floats2bfloat162_rn(float(a.z), float(a.w)), b.y, c.y, (d + 1));
+
+#define UFMAFF(a, b, c)      \
+  bf16fma((a->x), (b), (c)); \
+  bf16fma((a->y), (b), (c + 1));
+
+// host
+namespace wt
+{
+  __device__ void loadFromGmem(int N, int K, const float *A, const float *maxA, const float *B, const float *OB,
+                               float *As, float4 *Bs, int innerRowA, int innerColA,
+                               int innerRowB, int innerColB, int bmmshape)
+  {
+#pragma unroll
+    for (uint offset = 0; offset < BM; offset += rowStrideA)
+    {
+      if (
+          A + (innerRowA + offset) * (K * bmmshape) + innerColA * 4 < maxA)
+      {
+        const auto tmp = (float4 *)(A + (innerRowA + offset) * (K * bmmshape) + innerColA * 4);
+
+        As[(innerColA * 4 + 0) * BM + innerRowA + offset] = tmp->x;
+        As[(innerColA * 4 + 1) * BM + innerRowA + offset] = tmp->y;
+        As[(innerColA * 4 + 2) * BM + innerRowA + offset] = tmp->z;
+        As[(innerColA * 4 + 3) * BM + innerRowA + offset] = tmp->w;
       }
     }
-    for (uint wSubColIdx = 0; wSubColIdx < WNITER; ++wSubColIdx) {
-      for (uint i = 0; i < TN; ++i) {
-        regN[wSubColIdx * TN + i] =
-            Bs[(dotIdx * BN) + warpCol * WN + wSubColIdx * WSUBN +
-               threadColInWarp * TN + i];
-      }
-    }
 
-    // execute warptile matmul
-    for (uint wSubRowIdx = 0; wSubRowIdx < WMITER; ++wSubRowIdx) {
-      for (uint wSubColIdx = 0; wSubColIdx < WNITER; ++wSubColIdx) {
-        // calculate per-thread results
-        for (uint resIdxM = 0; resIdxM < TM; ++resIdxM) {
-          for (uint resIdxN = 0; resIdxN < TN; ++resIdxN) {
-            threadResults[(wSubRowIdx * TM + resIdxM) * (WNITER * TN) +
-                          (wSubColIdx * TN) + resIdxN] +=
-                regM[wSubRowIdx * TM + resIdxM] *
-                regN[wSubColIdx * TN + resIdxN];
+#pragma unroll
+    for (uint offset = 0; offset < BK; offset += rowStrideB)
+    {
+      unsigned long int start = (B + (innerRowB + offset) * N + innerColB * 4) - OB;
+      auto row = start % N;
+      auto col = start / N;
+      start = col + row * K;
+
+      auto bbs = Bs + (innerRowB + offset) * BN4 + innerColB;
+
+      bbs[0] = make_float4(OB[start],OB[start+K*1],OB[start+K*2],OB[start+K*3]);
+    
+      // asm("ld.global.v4.f32 {%0, %1, %2, %3}, [%4];"
+      //     : "=f"(Bs[(innerRowB + offset) * BN + innerColB * 4 + 0]),
+      //       "=f"(Bs[(innerRowB + offset) * BN + innerColB * 4 + 1]),
+      //       "=f"(Bs[(innerRowB + offset) * BN + innerColB * 4 + 2]),
+      //       "=f"(Bs[(innerRowB + offset) * BN + innerColB * 4 + 3])
+      //     : "l"(&B[(innerRowB + offset) * N + innerColB * 4]));
+    }
+  }
+
+  __device__ void
+  processFromSmem(float *regM, float4 *regN, float4 *threadResults, const float *As,
+                  const float4 *Bs, const uint warpRow, const uint warpCol,
+                  const uint threadRowInWarp, const uint threadColInWarp, const uint M)
+  {
+    // auto regMf4 = reinterpret_cast<float4 *>(regM);
+    // auto As4 = reinterpret_cast<const float4 *>(As);
+#pragma unroll
+    for (uint dotIdx = 0; dotIdx < BK; ++dotIdx)
+    {
+      // populate registers for whole warptile
+
+#pragma unroll
+      for (uint wSubRowIdx = 0; wSubRowIdx < WMITER; ++wSubRowIdx)
+      {
+#pragma unroll
+        for (uint i = 0; i < TM; ++i)
+        {
+          regM[wSubRowIdx * TM + i] =
+              As[(dotIdx * BM) + warpRow * WM + wSubRowIdx * WSUBM +
+                  threadRowInWarp * TM + i];
+        }
+      }
+#pragma unroll
+      for (uint wSubColIdx = 0; wSubColIdx < WNITER; ++wSubColIdx)
+      {
+#pragma unroll
+        for (uint i = 0; i < TN4; ++i)
+        {
+          regN[wSubColIdx * TN4 + i] = Bs[(dotIdx * BN4) + warpCol * WN4 + wSubColIdx * WSUBN4 + threadColInWarp * TN4 + i];
+        }
+      }
+
+// execute warptile matmul
+#pragma unroll
+      for (uint wSubRowIdx = 0; wSubRowIdx < WMITER; ++wSubRowIdx)
+      {
+#pragma unroll
+        for (uint wSubColIdx = 0; wSubColIdx < WNITER; ++wSubColIdx)
+        {
+// calculate per-thread results
+#pragma unroll
+          for (uint resIdxM = 0; resIdxM < TM; ++resIdxM)
+          {
+#pragma unroll
+            for (uint resIdxN = 0; resIdxN < TN4; ++resIdxN)
+            {
+              auto iiv = threadResults + (wSubRowIdx * TM + resIdxM) * (WNITER * TN4) +
+                         (wSubColIdx * TN4) + resIdxN;
+
+              auto rn = regN + wSubColIdx * TN4 + resIdxN;
+              auto rnn = regM[wSubRowIdx * TM + resIdxM];
+
+              // UFMAFF(rn, , ((unsigned int *)iiv));
+              iiv->x += rn->x * rnn;
+              iiv->y += rn->y * rnn;
+              iiv->z += rn->z * rnn;
+              iiv->w += rn->w * rnn;
+            }
           }
         }
       }
     }
   }
-}
 
 } // namespace wt
 
@@ -96,13 +176,15 @@ processFromSmem(float *regM, float *regN, float *threadResults, const float *As,
  * @tparam TM The per-thread tile size for M dimension.
  * @tparam TN The per-thread tile size for N dimension.
  */
-template <const int BM, const int BN, const int BK, const int WM, const int WN,
-          const int WNITER, const int TM, const int TN, const int NUM_THREADS>
 __global__ void __launch_bounds__(NUM_THREADS)
     sgemmWarptiling(int M, int N, int K, float *A, float *B,
-                    float *C) {
+                    float *C, int bmmshape)
+{
   const uint cRow = blockIdx.y;
   const uint cCol = blockIdx.x;
+  const float *maxc = C + M * N * bmmshape;
+  const float *maxA = A + M * K * bmmshape;
+  const float *OB = B;
 
   // Placement of the warp in the threadblock tile
   const uint warpIdx = threadIdx.x / WARPSIZE; // the warp this thread is in
@@ -110,9 +192,6 @@ __global__ void __launch_bounds__(NUM_THREADS)
   const uint warpRow = warpIdx / (BN / WN);
 
   // size of the warp subtile
-  constexpr uint WMITER = (WM * WN) / (WARPSIZE * TM * TN * WNITER);
-  constexpr uint WSUBM = WM / WMITER; // 64/2=32
-  constexpr uint WSUBN = WN / WNITER; // 32/2=16
 
   // Placement of the thread in the warp subtile
   const uint threadIdxInWarp = threadIdx.x % WARPSIZE;         // [0, 31]
@@ -121,127 +200,145 @@ __global__ void __launch_bounds__(NUM_THREADS)
 
   // allocate space for the current blocktile in SMEM
   __shared__ float As[BM * BK];
-  __shared__ float Bs[BK * BN];
+  __shared__ float4 Bs[BK * BN4];
 
   // Move blocktile to beginning of A's row and B's column
-  A += cRow * BM * K;
-  B += cCol * BN;
+
   // Move C_ptr to warp's output tile
-  C += (cRow * BM + warpRow * WM) * N + cCol * BN + warpCol * WN;
 
   // calculating the indices that this thread will load into SMEM
   // we'll load 128bit / 32bit = 4 elements per thread at each step
-  const uint innerRowA = threadIdx.x / (BK / 4);
-  const uint innerColA = threadIdx.x % (BK / 4);
-  constexpr uint rowStrideA = (NUM_THREADS * 4) / BK;
-  const uint innerRowB = threadIdx.x / (BN / 4);
-  const uint innerColB = threadIdx.x % (BN / 4);
-  constexpr uint rowStrideB = NUM_THREADS / (BN / 4);
+
+  const uint innerRowA = threadIdx.x / (BK4);
+  const uint innerColA = threadIdx.x % (BK4);
+  const uint innerRowB = threadIdx.x / (BN4);
+  const uint innerColB = threadIdx.x % (BN4);
 
   // allocate thread-local cache for results in registerfile
-  float threadResults[WMITER * TM * WNITER * TN] = {0.0};
-  // we cache into registers on the warptile level
-  float regM[WMITER * TM] = {0.0};
-  float regN[WNITER * TN] = {0.0};
 
   // outer-most loop over block tiles
-  for (uint bkIdx = 0; bkIdx < K; bkIdx += BK) {
-    wt::loadFromGmem<BM, BN, BK, rowStrideA, rowStrideB>(
-        N, K, A, B, As, Bs, innerRowA, innerColA, innerRowB, innerColB);
-    __syncthreads();
-    wt::processFromSmem<BM, BN, BK, WM, WN, WMITER, WNITER, WSUBM, WSUBN, TM,
-                        TN>(regM, regN, threadResults, As, Bs, warpRow, warpCol,
-                            threadRowInWarp, threadColInWarp);
-    A += BK;     // move BK columns to right
-    B += BK * N; // move BK rows down
-    __syncthreads();
-  }
 
-  // write out the results
-  for (uint wSubRowIdx = 0; wSubRowIdx < WMITER; ++wSubRowIdx) {
-    for (uint wSubColIdx = 0; wSubColIdx < WNITER; ++wSubColIdx) {
-      // move C pointer to current warp subtile
-      float *C_interim = C + (wSubRowIdx * WSUBM) * N + wSubColIdx * WSUBN;
-      for (uint resIdxM = 0; resIdxM < TM; resIdxM += 1) {
-        for (uint resIdxN = 0; resIdxN < TN; resIdxN += 4) {
-          // load C vector into registers
-          float4 tmp = reinterpret_cast<float4 *>(
-              &C_interim[(threadRowInWarp * TM + resIdxM) * N +
-                         threadColInWarp * TN + resIdxN])[0];
-          // perform GEMM update in reg
-          const int i = (wSubRowIdx * TM + resIdxM) * (WNITER * TN) +
-                        wSubColIdx * TN + resIdxN;
-          tmp.x = threadResults[i + 0] + tmp.x;
-          tmp.y = threadResults[i + 1] + tmp.y;
-          tmp.z = threadResults[i + 2] + tmp.z;
-          tmp.w = threadResults[i + 3] + tmp.w;
-          // write back
-          reinterpret_cast<float4 *>(
-              &C_interim[(threadRowInWarp * TM + resIdxM) * N +
-                         threadColInWarp * TN + resIdxN])[0] = tmp;
+  float4 threadResults4[WMITER * TM * WNITER * TN4];
+  auto AO = A;
+  for (uint BMMINDEX = 0; BMMINDEX < bmmshape; BMMINDEX += 1)
+  {
+    for(uint yy = 0; yy < WMITER * TM * WNITER * TN4; yy++){
+      threadResults4[yy] = make_float4(0,0,0,0);
+    }
+    // we cache into registers on the warptile level
+    float regM[WMITER * TM] = {0.0};
+    float4 regN[WNITER * TN4];
+
+    auto A = AO + cRow * BM * K * bmmshape + BMMINDEX * K;
+    auto B = OB + cCol * BN + N * K * BMMINDEX;
+    for (uint bkIdx = 0; bkIdx < K; bkIdx += BK)
+    {
+      wt::loadFromGmem(
+          N, K, A, maxA, B, OB + N * K * BMMINDEX, As, Bs, innerRowA, innerColA, innerRowB, innerColB, bmmshape);
+      __syncthreads();
+      wt::processFromSmem(regM, regN, threadResults4, As, Bs, warpRow, warpCol,
+                          threadRowInWarp, threadColInWarp, M);
+      A += BK;     // move BK columns to right
+      B += BK * N; // move BK rows down
+
+      __syncthreads();
+    }
+
+    // float4 *threadResults4 = (float4 *)threadResults;
+
+// write out the results
+#pragma unroll
+    for (uint wSubRowIdx = 0; wSubRowIdx < WMITER; ++wSubRowIdx)
+    {
+
+#pragma unroll
+      for (uint wSubColIdx = 0; wSubColIdx < WNITER; ++wSubColIdx)
+      {
+#pragma unroll
+        for (uint resIdxM = 0; resIdxM < TM; resIdxM += 1)
+        {
+
+#pragma unroll
+          for (uint resIdxN = 0; resIdxN < TN4; resIdxN += 1)
+          {
+
+            auto iix = C + BMMINDEX * M * N + (cRow * BM + warpRow * WM + threadRowInWarp * TM + wSubRowIdx * WSUBM + resIdxM) * N + cCol * BN + warpCol * WN + wSubColIdx * WSUBN + threadColInWarp * TN + resIdxN * 4;
+
+            if (iix < maxc)
+            {
+              auto iiy = (float4 *)(((float *)threadResults4) + (wSubRowIdx * TM + resIdxM) * (WNITER * TN) + wSubColIdx * TN + resIdxN * 4);
+
+              auto iixh = reinterpret_cast<float4 *>(iix);
+              
+
+              iixh->x += iiy->x;
+              iixh->y += iiy->y;
+              iixh->z += iiy->z;
+              iixh->w += iiy->w;
+            }
+          }
         }
       }
     }
   }
 }
 
-
-void runSgemmWarptiling(int M, int N, int K, float *A, float *B, float *C) {
+void runSgemmWarptiling(int M, int N, int K, float *A, float *B, float *C, int bmmshape)
+{
   // Settings for A100
-  // const uint K10_NUM_THREADS = 128;
-  // const uint K10_BN = 128;
-  // const uint K10_BM = 64;
-  // const uint K10_BK = 16;
-  // const uint K10_WN = 64;
-  // const uint K10_WM = 32;
-  // const uint K10_WNITER = 1;
-  // const uint K10_TN = 4;
-  // const uint K10_TM = 4;
-  // Settings for A6000
-  const uint K10_NUM_THREADS = 128;
-  const uint K10_BN = 128;
-  const uint K10_BM = 128;
-  const uint K10_BK = 16;
-  const uint K10_WN = 64;
-  const uint K10_WM = 64;
-  const uint K10_WNITER = 4;
-  const uint K10_TN = 4;
-  const uint K10_TM = 8;
-  dim3 blockDim(K10_NUM_THREADS);
 
-  constexpr uint NUM_WARPS = K10_NUM_THREADS / 32;
+  dim3 blockDim(NUM_THREADS);
+
+  constexpr uint NUM_WARPS = NUM_THREADS / 32;
 
   // warptile in threadblocktile
-  static_assert((K10_BN % K10_WN == 0) and (K10_BM % K10_WM == 0));
-  static_assert((K10_BN / K10_WN) * (K10_BM / K10_WM) == NUM_WARPS);
+  static_assert((BN % WN == 0) and (BM % WM == 0));
+  static_assert((BN / WN) * (BM / WM) == NUM_WARPS);
 
   // threads in warpsubtile
-  static_assert((K10_WM * K10_WN) % (WARPSIZE * K10_TM * K10_TN * K10_WNITER) ==
+  static_assert((WM * WN) % (WARPSIZE * TM * TN * WNITER) ==
                 0);
-  constexpr uint K10_WMITER =
-      (K10_WM * K10_WN) / (32 * K10_TM * K10_TN * K10_WNITER);
-  // warpsubtile in warptile
-  static_assert((K10_WM % K10_WMITER == 0) and (K10_WN % K10_WNITER == 0));
 
-  static_assert((K10_NUM_THREADS * 4) % K10_BK == 0,
+  // warpsubtile in warptile
+  static_assert((WM % WMITER == 0) and (WN % WNITER == 0));
+
+  static_assert((NUM_THREADS * 4) % BK == 0,
                 "NUM_THREADS*4 must be multiple of K9_BK to avoid quantization "
                 "issues during GMEM->SMEM tiling (loading only parts of the "
                 "final row of Bs during each iteraion)");
-  static_assert((K10_NUM_THREADS * 4) % K10_BN == 0,
+  static_assert((NUM_THREADS * 4) % BN == 0,
                 "NUM_THREADS*4 must be multiple of K9_BN to avoid quantization "
                 "issues during GMEM->SMEM tiling (loading only parts of the "
                 "final row of As during each iteration)");
-  static_assert(K10_BN % (16 * K10_TN) == 0,
-                "BN must be a multiple of 16*TN to avoid quantization effects");
-  static_assert(K10_BM % (16 * K10_TM) == 0,
-                "BM must be a multiple of 16*TM to avoid quantization effects");
-  static_assert((K10_BM * K10_BK) % (4 * K10_NUM_THREADS) == 0,
+  // static_assert(BN % (16 * TN) == 0,
+  //               "BN must be a multiple of 16*TN to avoid quantization effects");
+  // static_assert(BM % (16 * TM) == 0,
+  //               "BM must be a multiple of 16*TM to avoid quantization effects");
+  static_assert((BM * BK) % (4 * NUM_THREADS) == 0,
                 "BM*BK must be a multiple of 4*256 to vectorize loads");
-  static_assert((K10_BN * K10_BK) % (4 * K10_NUM_THREADS) == 0,
+  static_assert((BN * BK) % (4 * NUM_THREADS) == 0,
                 "BN*BK must be a multiple of 4*256 to vectorize loads");
 
-  dim3 gridDim(CEIL_DIV(N, K10_BN), CEIL_DIV(M, K10_BM));
-  sgemmWarptiling<K10_BM, K10_BN, K10_BK, K10_WM, K10_WN, K10_WNITER, K10_TM,
-                  K10_TN, K10_NUM_THREADS>
-      <<<gridDim, blockDim>>>(M, N, K, A, B, C);
+  dim3 gridDim(CEIL_DIV(N, BN), CEIL_DIV(M, BM));
+  sgemmWarptiling<<<gridDim, blockDim>>>(M, N, K, A, B, C, bmmshape);
+
+  cudaDeviceSynchronize();
+  // get error
+  cudaError_t error = cudaGetLastError();
+  if (error != cudaSuccess)
+  {
+    fprintf(stderr, "ERROR: %s \n", cudaGetErrorString(error));
+    throw std::runtime_error("CUDA kernel failed");
+  }
+}
+
+void matmul_cuda_kernal(void *A, void *B, void *C, size_t BBT, size_t INSHAPE, size_t OUTSHAPE, TENSORTYPE dtype, size_t bmmshape)
+{
+
+ 
+   
+     runSgemmWarptiling(BBT, OUTSHAPE, INSHAPE, (float *)B, (float *)A, (float *)C, bmmshape);
+    
+  
+  // max size 1024
 }

@@ -36,11 +36,7 @@
 #define WSUBM4 WM4 / WMITER // 8/2=4
 // const int WARPSIZE = 32; // warpSize is not constexpr
 
-struct bfloat1624
-{
-  __nv_bfloat162 x = __float2bfloat162_rn(0.0f);
-  __nv_bfloat162 y = __float2bfloat162_rn(0.0f);
-};
+struct bfloat1624;
 
 // __fmaf_rn((a.x), (b.x), (c.x)), __fmaf_rn((a.y), (b.y), (c.y)), __fmaf_rn((a.z), (b.z), (c.z)), __fmaf_rn((a.w), (b.w), (c.w)) \
 
@@ -59,46 +55,41 @@ struct bfloat1624
 namespace wt
 {
   __device__ void loadFromGmem8(int N, int K, const float *A, const float *maxA, const uint8_t *B, const uint8_t *OB, bfloat1624 *range, bfloat1624 *off,
-                                float *As, bfloat1624 *Bs, int innerRowA, int innerColA,
+                                float *As, float4 *Bs, int innerRowA, int innerColA,
                                 int innerRowB, int innerColB)
   {
 #pragma unroll
     for (uint offset = 0; offset < BM; offset += rowStrideA)
     {
       if (
-          A + (innerRowA + offset) * K + innerColA * 4 < maxA)
+          A + (innerRowA + offset) * (K * 1) + innerColA * 4 < maxA)
       {
-        const auto tmp = (float4 *)(A + (innerRowA + offset) * K + innerColA * 4);
+        const auto tmp = (float4 *)(A + (innerRowA + offset) * (K * 1) + innerColA * 4);
 
-        asm("{.reg .b16 low;\n"
-            "  cvt.rn.bf16.f32 low, %1;\n"
-            "  mov.b32 %0, {low,low};}\n" : "=r"(*((unsigned int *)(As + (innerColA * 4 + 0) * BM + innerRowA + offset))) : "f"((tmp)->x));
-        asm("{.reg .b16 low;\n"
-            "  cvt.rn.bf16.f32 low, %1;\n"
-            "  mov.b32 %0, {low,low};}\n" : "=r"(*((unsigned int *)(As + (innerColA * 4 + 1) * BM + innerRowA + offset))) : "f"((tmp)->y));
-        asm("{.reg .b16 low;\n"
-            "  cvt.rn.bf16.f32 low, %1;\n"
-            "  mov.b32 %0, {low,low};}\n" : "=r"(*((unsigned int *)(As + (innerColA * 4 + 2) * BM + innerRowA + offset))) : "f"((tmp)->z));
-        asm("{.reg .b16 low;\n"
-            "  cvt.rn.bf16.f32 low, %1;\n"
-            "  mov.b32 %0, {low,low};}\n" : "=r"(*((unsigned int *)(As + (innerColA * 4 + 3) * BM + innerRowA + offset))) : "f"((tmp)->w));
+        As[(innerColA * 4 + 0) * BM + innerRowA + offset] = tmp->x;
+        As[(innerColA * 4 + 1) * BM + innerRowA + offset] = tmp->y;
+        As[(innerColA * 4 + 2) * BM + innerRowA + offset] = tmp->z;
+        As[(innerColA * 4 + 3) * BM + innerRowA + offset] = tmp->w;
       }
     }
 
 #pragma unroll
     for (uint offset = 0; offset < BK; offset += rowStrideB)
     {
-      unsigned long int start =  (B + (innerRowB + offset) * N + innerColB*4) - OB;
-      auto row = start%N;
-      auto col = start/N;
-      start = col+ row*K ;
-      auto aa = make_uchar4(
-        OB[start],
-        OB[start+K],
-        OB[start+K+K],
-        OB[start+K+K+K]
-      );
-      UFMAF(aa, range[innerColB], off[innerColB], ((unsigned int *)(Bs + (innerRowB + offset) * BN4 + innerColB)));
+      unsigned long int start = (B + (innerRowB + offset) * N + innerColB * 4) - OB;
+      auto row = start % N;
+      auto col = start / N;
+      start = col + row * K;
+
+      auto bbs = Bs + (innerRowB + offset) * BN4 + innerColB;
+
+      auto bbsx = bfloat1624({__float22bfloat162_rn(make_float2(OB[start], OB[start + K * 1])), __float22bfloat162_rn(make_float2(OB[start + K * 2], OB[start + K * 3]))});
+      bbsx.x = bbsx.x * range[innerColB].x + off[innerColB].x;
+      bbsx.y = bbsx.y * range[innerColB].y + off[innerColB].y;
+      bbs[0].x = bbsx.x.x;
+      bbs[0].y = bbsx.x.y;
+      bbs[0].z = bbsx.y.x;
+      bbs[0].w = bbsx.y.y;
 
       // asm("ld.global.v4.f32 {%0, %1, %2, %3}, [%4];"
       //     : "=f"(Bs[(innerRowB + offset) * BN + innerColB * 4 + 0]),
@@ -110,12 +101,12 @@ namespace wt
   }
 
   __device__ void
-  processFromSmem8(float *regM, bfloat1624 *regN, bfloat1624 *threadResults, const float *As,
-                   const bfloat1624 *Bs, const uint warpRow, const uint warpCol,
+  processFromSmem8(float *regM, float4 *regN, float4 *threadResults, const float *As,
+                   const float4 *Bs, const uint warpRow, const uint warpCol,
                    const uint threadRowInWarp, const uint threadColInWarp, const uint M)
   {
-    auto regMf4 = reinterpret_cast<float4 *>(regM);
-    auto As4 = reinterpret_cast<const float4 *>(As);
+    // auto regMf4 = reinterpret_cast<float4 *>(regM);
+    // auto As4 = reinterpret_cast<const float4 *>(As);
 #pragma unroll
     for (uint dotIdx = 0; dotIdx < BK; ++dotIdx)
     {
@@ -125,11 +116,11 @@ namespace wt
       for (uint wSubRowIdx = 0; wSubRowIdx < WMITER; ++wSubRowIdx)
       {
 #pragma unroll
-        for (uint i = 0; i < TM4; ++i)
+        for (uint i = 0; i < TM; ++i)
         {
-          regMf4[wSubRowIdx * TM4 + i] =
-              As4[(dotIdx * BM4) + warpRow * WM4 + wSubRowIdx * WSUBM4 +
-                  threadRowInWarp * TM4 + i];
+          regM[wSubRowIdx * TM + i] =
+              As[(dotIdx * BM) + warpRow * WM + wSubRowIdx * WSUBM +
+                 threadRowInWarp * TM + i];
         }
       }
 #pragma unroll
@@ -160,8 +151,13 @@ namespace wt
                          (wSubColIdx * TN4) + resIdxN;
 
               auto rn = regN + wSubColIdx * TN4 + resIdxN;
+              auto rnn = regM[wSubRowIdx * TM + resIdxM];
 
-              UFMAFF(rn, regM[wSubRowIdx * TM + resIdxM], ((unsigned int *)iiv));
+              // UFMAFF(rn, , ((unsigned int *)iiv));
+              iiv->x += rn->x * rnn;
+              iiv->y += rn->y * rnn;
+              iiv->z += rn->z * rnn;
+              iiv->w += rn->w * rnn;
             }
           }
         }
@@ -190,7 +186,7 @@ __global__ void __launch_bounds__(NUM_THREADS)
   const uint cCol = blockIdx.x;
   const float *maxc = C + M * N;
   const float *maxA = A + M * K;
-  const uint8_t* OB = B;
+  const uint8_t *OB = B;
 
   // Placement of the warp in the threadblock tile
   const uint warpIdx = threadIdx.x / WARPSIZE; // the warp this thread is in
@@ -206,7 +202,7 @@ __global__ void __launch_bounds__(NUM_THREADS)
 
   // allocate space for the current blocktile in SMEM
   __shared__ float As[BM * BK];
-  __shared__ bfloat1624 Bs[BK * BN4];
+  __shared__ float4 Bs[BK * BN4];
 
   // Move blocktile to beginning of A's row and B's column
   A += cRow * BM * K;
@@ -224,20 +220,28 @@ __global__ void __launch_bounds__(NUM_THREADS)
   const uint innerColB = threadIdx.x % (BN4);
 
   // allocate thread-local cache for results in registerfile
-  bfloat1624 threadResults4[WMITER * TM * WNITER * TN4];
+  float4 threadResults4[WMITER * TM * WNITER * TN4];
+  for (uint yy = 0; yy < WMITER * TM * WNITER * TN4; yy++)
+  {
+    threadResults4[yy] = make_float4(0, 0, 0, 0);
+  }
   // we cache into registers on the warptile level
   float regM[WMITER * TM] = {0.0};
-  bfloat1624 regN[WNITER * TN4];
+  float4 regN[WNITER * TN4];
+  for (uint yy = 0; yy < WMITER * TN4; yy++)
+  {
+    regN[yy] = make_float4(0, 0, 0, 0);
+  }
 
   // outer-most loop over block tiles
   for (uint bkIdx = 0; bkIdx < K; bkIdx += BK)
   {
     wt::loadFromGmem8(
-        N, K, A, maxA, B,OB, range, off, As, Bs, innerRowA, innerColA, innerRowB, innerColB);
+        N, K, A, maxA, B, OB, range, off, As, Bs, innerRowA, innerColA, innerRowB, innerColB);
     __syncthreads();
     wt::processFromSmem8(regM, regN, threadResults4, As, Bs, warpRow, warpCol,
                          threadRowInWarp, threadColInWarp, M);
-    A += BK;      // move BK columns to right
+    A += BK;     // move BK columns to right
     B += BK * N; // move BK rows down
 
     __syncthreads();
@@ -264,21 +268,14 @@ __global__ void __launch_bounds__(NUM_THREADS)
           auto iix = C + (cRow * BM + warpRow * WM + threadRowInWarp * TM + wSubRowIdx * WSUBM + resIdxM) * N + cCol * BN + warpCol * WN + wSubColIdx * WSUBN + threadColInWarp * TN + resIdxN * 4;
           if (iix < maxc)
           {
-            auto iiy = (bfloat1624 *)(((bfloat16 *)threadResults4) + (wSubRowIdx * TM + resIdxM) * (WNITER * TN) + wSubColIdx * TN + resIdxN * 4);
+            auto iiy = (float4 *)(((float *)threadResults4) + (wSubRowIdx * TM + resIdxM) * (WNITER * TN) + wSubColIdx * TN + resIdxN * 4);
 
-            auto iixh = reinterpret_cast<bfloat1624 *>(iix);
-            auto iixh2 = iixh + 1;
-            iixh->x.x = iixh->x.y;
-            iixh->x.y = iixh->y.y;
-            iixh->y.x = iixh2->x.y;
-            iixh->y.y = iixh2->y.y;
+            auto iixh = reinterpret_cast<float4 *>(iix);
 
-            auto a = __hadd2(iiy->x, iixh->x);
-            auto b = __hadd2(iiy->y, iixh->y);
-            iixh->x.y = a.x;
-            iixh->y.y = a.y;
-            iixh2->x.y = b.x;
-            iixh2->y.y = b.y;
+            iixh->x += iiy->x;
+            iixh->y += iiy->y;
+            iixh->z += iiy->z;
+            iixh->w += iiy->w;
           }
         }
       }
@@ -371,7 +368,9 @@ __global__ void kernelc_mm8_one(
   // for (int i = 1; i < warpSize; i *= 2)
   //   xsum += __shfl_xor_sync(-1, xsum, i);
   // bfloat16 xsum = __shfl_sync(0xffffffff, sumate, 0);
-  __shared__ __nv_bfloat162 hotspace[32][32];
+  
+
+ __shared__ __nv_bfloat162 hotspace[32][32];
 
   __nv_bfloat16 xsum = __float2bfloat16(0.0);
 
@@ -386,9 +385,9 @@ __global__ void kernelc_mm8_one(
 __nv_bfloat162 xsumx = __nv_bfloat162(xsum,xsum);
 
   
-
+size_t end = OUTPUTSIZE - outstart;
 #pragma unroll
-  for (int i = 0; i < 32; i+=1)
+  for (int i = 0; i < 32 && i < end; i+=1)
   {
 
     __nv_bfloat162 xout = make_bfloat162(__float2bfloat16(0.0),__float2bfloat16(0.0));
@@ -407,8 +406,8 @@ __nv_bfloat162 xsumx = __nv_bfloat162(xsum,xsum);
 
     auto xouts = __hfma2(xout, *r, *o * (xsumx));
 
-    for (int i = 1; i < warpSize; i *= 2)
-      xouts += __shfl_xor_sync(-1, xouts, i);
+    for (int ij = 1; ij < warpSize; ij *= 2)
+      xouts += __shfl_xor_sync(-1, xouts, ij);
 
     if (warppos == 0)
     {
@@ -431,11 +430,12 @@ __nv_bfloat162 xsumx = __nv_bfloat162(xsum,xsum);
   for (int i = 1; i < warpSize; i *= 2)
     xouts += __shfl_xor_sync(-1, xouts, i);
     
-  if (warppos == 0)
+  if (warppos == 0 && warp < OUTPUTSIZE-outstart)
   {
     auto outt = __bfloat1622float2(xouts);
-    ystart[warp].x += outt.x;
-    ystart[warp].y += outt.y;
+    atomicAdd(&ystart[warp].x, outt.x);
+    atomicAdd(&ystart[warp].y, outt.y);
+   
     
   }
   // }
@@ -444,7 +444,7 @@ __nv_bfloat162 xsumx = __nv_bfloat162(xsum,xsum);
 void matmul8_cuda_kernal(uint8_t *A, void *B, void *C, void *Ao, void *Ar, size_t BBT, size_t INSHAPE, size_t OUTSHAPE)
 {
 
-  if (BBT != 1)
+  if (BBT != 1 || (OUTSHAPE%tsplit != 0))
   {
     runSgemmWarptiling8(BBT, OUTSHAPE, INSHAPE, (float *)B, (uint8_t *)A, (bfloat1624 *)Ar, (bfloat1624 *)Ao, (float *)C);
   }
@@ -452,46 +452,49 @@ void matmul8_cuda_kernal(uint8_t *A, void *B, void *C, void *Ao, void *Ar, size_
   {
 
     dim3 gridSize(OUTSHAPE / (tsplit), 1, 1);
+    // assert(tsplit%OUTSHAPE == 0);
+    
     dim3 blockSize(jsplit, 1, 1);
 
     if (INSHAPE == 2048)
     {
-      kernelc_mm8_one<2048/jsplit><<<gridSize, blockSize>>>(
+      kernelc_mm8_one<2048 / jsplit><<<gridSize, blockSize>>>(
           INSHAPE, OUTSHAPE, (float *)B, A, (__nv_bfloat162 *)Ar, (__nv_bfloat162 *)Ao, (float *)C);
     }
     else if (INSHAPE == 2560)
     {
       // kernelc_mm8_one<2560/jsplit><<<gridSize, blockSize>>>(
       //     INSHAPE, OUTSHAPE, (float *)B, A, (__nv_bfloat162 *)Ar, (__nv_bfloat162 *)Ao, (float *)C);
-       runSgemmWarptiling8(BBT, OUTSHAPE, INSHAPE, (float *)B, (uint8_t *)A, (bfloat1624 *)Ar, (bfloat1624 *)Ao, (float *)C);
-  
+      runSgemmWarptiling8(BBT, OUTSHAPE, INSHAPE, (float *)B, (uint8_t *)A, (bfloat1624 *)Ar, (bfloat1624 *)Ao, (float *)C);
     }
     else if (INSHAPE == 8960)
     {
       // kernelc_mm8_one<8960/jsplit><<<gridSize, blockSize>>>(
       //     INSHAPE, OUTSHAPE, (float *)B, A, (__nv_bfloat162 *)Ar, (__nv_bfloat162 *)Ao, (float *)C);
-       runSgemmWarptiling8(BBT, OUTSHAPE, INSHAPE, (float *)B, (uint8_t *)A, (bfloat1624 *)Ar, (bfloat1624 *)Ao, (float *)C);
-  
+      runSgemmWarptiling8(BBT, OUTSHAPE, INSHAPE, (float *)B, (uint8_t *)A, (bfloat1624 *)Ar, (bfloat1624 *)Ao, (float *)C);
     }
     else if (
         INSHAPE == 7168)
     {
-      kernelc_mm8_one<7168/jsplit><<<gridSize, blockSize>>>(
-          INSHAPE, OUTSHAPE, (float *)B, A, (__nv_bfloat162 *)Ar, (__nv_bfloat162 *)Ao, (float *)C);
-    }else if (
+      runSgemmWarptiling8(BBT, OUTSHAPE, INSHAPE, (float *)B, (uint8_t *)A, (bfloat1624 *)Ar, (bfloat1624 *)Ao, (float *)C);
+    }
+    else if (
         INSHAPE == 4096)
     {
-      kernelc_mm8_one<4096/jsplit><<<gridSize, blockSize>>>(
+      kernelc_mm8_one<4096 / jsplit><<<gridSize, blockSize>>>(
           INSHAPE, OUTSHAPE, (float *)B, A, (__nv_bfloat162 *)Ar, (__nv_bfloat162 *)Ao, (float *)C);
-    }else if (
-      INSHAPE == 14336)
-  {
-    kernelc_mm8_one<14336/jsplit><<<gridSize, blockSize>>>(
-        INSHAPE, OUTSHAPE, (float *)B, A, (__nv_bfloat162 *)Ar, (__nv_bfloat162 *)Ao, (float *)C);
-  }
-    else{
-      std::cout << "Not supported " << INSHAPE;
+    }
+    else if (
+        INSHAPE == 14336)
+    {
+      kernelc_mm8_one<14336 / jsplit><<<gridSize, blockSize>>>(
+          INSHAPE, OUTSHAPE, (float *)B, A, (__nv_bfloat162 *)Ar, (__nv_bfloat162 *)Ao, (float *)C);
+    }
+    else
+    {
+      runSgemmWarptiling8(BBT, OUTSHAPE, INSHAPE, (float *)B, (uint8_t *)A, (bfloat1624 *)Ar, (bfloat1624 *)Ao, (float *)C);
     }
   }
   // max size 1024
 }
+

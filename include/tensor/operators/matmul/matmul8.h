@@ -8,15 +8,16 @@
 CPUONLY(matmul8_cpu_kernal(uint8_t* A, void* B, void* C, void* Ao, void* Ar, size_t BBT, size_t INSHAPE, size_t OUTSHAPE));
 CUDAONLY(matmul8_cuda_kernal(uint8_t* A, void* B, void* C, void* Ao, void* Ar, size_t BBT, size_t INSHAPE, size_t OUTSHAPE))
 
-CPUONLY(matmul_cpu_kernal(void* A, void* B, void* C, size_t BBT, size_t INSHAPE, size_t OUTSHAPE, TENSORTYPE dtype));
-CUDAONLY(matmul_cuda_kernal(void* A, void* B, void* C, size_t BBT, size_t INSHAPE, size_t OUTSHAPE,TENSORTYPE dtype))
-
+CPUONLY(matmul_cpu_kernal(void* A, void* B, void* C, size_t BBT, size_t INSHAPE, size_t OUTSHAPE, TENSORTYPE dtype, size_t bmmshape));
+CUDAONLY(matmul_cuda_kernal(void* A, void* B, void* C, size_t BBT, size_t INSHAPE, size_t OUTSHAPE,TENSORTYPE dtype, size_t bmmshape))
+        
 CPUONLY(wkv5_cpu_kernel(void* kk, void* vv, void* ww, void* uu, void* rr, void* ss, void* out, size_t T, size_t B, size_t C, size_t H, TENSORTYPE dtype))
 CUDAONLY(wkv5_cuda_kernel(void* kk, void* vv, void* ww, void* uu, void* rr, void* ss, void* out, size_t T, size_t B, size_t C, size_t H, TENSORTYPE dtype))
 
 inline Tensor Tensor::matmul(Tensor &Art, Tensor &Aot,
                       Tensor &Bt, Tensor Ct)
 {
+    assert(this->shape.size() < 3);
     // Pointers to the data
     if (Bt.dtype != TENSORTYPE::kFLOAT_32)
     {
@@ -55,6 +56,9 @@ inline Tensor Tensor::matmul(Tensor &Art, Tensor &Aot,
 
 inline Tensor Tensor::matmul(Tensor &Bt, Tensor Ct)
 {
+    if(this->data == nullptr || data_size_in_bytes == 0){
+        return Ct;
+    }
     // Pointers to the data
     if (Bt.dtype != TENSORTYPE::kFLOAT_32 && Bt.dtype != TENSORTYPE::kBFLOAT_16)
     {
@@ -63,26 +67,41 @@ inline Tensor Tensor::matmul(Tensor &Bt, Tensor Ct)
     }
     const auto A = this->data;
     const auto B = Bt.data;
+
+    size_t bmmsize = 1;
+    size_t OUTSHAPE = this->shape[0];
+    size_t INSHAPE = this->shape[1];
+    size_t BB = Bt.shape[0];
+    size_t T = Bt.shape[1];
+
+    if(this->shape.size() == 3){
+        bmmsize = this->shape[0];
+        OUTSHAPE = this->shape[1];
+        INSHAPE = this->shape[2];
+    }
+
     if (Ct.data == nullptr)
     {
-        Ct = Tensor({Bt.shape[0], Bt.shape[1], this->shape[0]}, Bt.dtype, Bt.device, Bt.device_id);
+        Ct = Tensor({BB*bmmsize, T, OUTSHAPE}, Bt.dtype, Bt.device, Bt.device_id);
     }
+
+    // std::cout << Ct;
+    // std::cout << *this;
+    // std::cout << Bt;
 
     const auto C = Ct.data;
 
-    const size_t BB = Bt.shape[0];
-    const size_t T = Bt.shape[1];
-    const size_t INSHAPE = Bt.shape[2];
-    const size_t OUTSHAPE = this->shape[0];
+    
+    
 
     if(Bt.device==DEVICE::CPU){
-        matmul_cpu_kernal((void *)A, (void *)B, (void *)C, BB * T, INSHAPE, OUTSHAPE, Bt.dtype);
+        matmul_cpu_kernal((void *)A, (void *)B, (void *)C, BB * T, INSHAPE, OUTSHAPE, Bt.dtype, bmmsize);
     } 
     else
     {
     
         
-        matmul_cuda_kernal((void *)A, (void *)B, (void *)C, BB * T, INSHAPE, OUTSHAPE, Bt.dtype);
+        matmul_cuda_kernal((void *)A, (void *)B, (void *)C, BB * T, INSHAPE, OUTSHAPE, Bt.dtype, bmmsize);
         
     }
 

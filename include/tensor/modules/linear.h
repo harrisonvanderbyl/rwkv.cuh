@@ -5,81 +5,155 @@
 #include <iostream>
 class Linear
 {
-    public:
-        Tensor weight;
-        Tensor range;
-        Tensor offset;
-        Tensor buffer = Tensor();
-        bool quantized = false;
-        bool splitHorizontal = true;
-        Linear(){
-            
+public:
+    Tensor weight;
+    Tensor range;
+    Tensor offset;
+    Tensor buffer = Tensor();
+    Tensor bias = Tensor();
+    bool quantized = false;
+    bool hasbias = false;
+    bool splitHorizontal = true;
+    size_t bmm_size = 1;
+    size_t outshape;
+    size_t inshape;
+    Linear()
+    {
+    }
+
+    Linear(safetensors &model, std::string prefix)
+    {
+        if (model.contains(prefix + ".weight.zero"))
+        {
+            this->range = model[prefix + ".weight.range"];
+            this->offset = model[prefix + ".weight.zero"];
+            this->weight = model[prefix + ".weight"];
+            this->quantized = true;
+        }
+        else
+        {
+            this->weight = model[prefix + ".weight"];
         }
 
-        Linear(safetensors& model, std::string prefix){
-            if (model.contains(prefix + ".weight.zero")){
-                this->range = model[prefix + ".weight.range"];
-                this->offset = model[prefix + ".weight.zero"];
-                this->weight = model[prefix + ".weight"];
-                this->quantized = true;
+        this->outshape = weight.shape[0];
+        this->inshape = weight.shape[1];
 
-            }else{
-                this->weight = model[prefix + ".weight"];
-            }
-            
+        if (this->weight.shape.size() == 3)
+        {
+            this->bmm_size = this->weight.shape[0];
+            this->outshape = weight.shape[1];
+            this->inshape = weight.shape[2];
         }
 
-        // Copy constructor
-        Linear(const Linear& other){
-            this->weight = other.weight;
-            this->range = other.range;
-            this->offset = other.offset;
-            this->quantized = other.quantized;
-            this->buffer = other.buffer;
-
+        if (model.contains(prefix + ".bias"))
+        {
+            this->bias = model[prefix + ".bias"].cloneWithFalseReshape({bmm_size,outshape});
+            this->hasbias = true;
         }
+
         
-        // default copy assignment operator
-        Linear& operator=(const Linear& other) = default;
-    
-        
-        Tensor operator()(Tensor input) {
+    }
 
-            if(buffer.data == nullptr || buffer.shape[0] * buffer.shape[1] < input.shape[0] * input.shape[1] || buffer.dtype != input.dtype || buffer.device != input.device){
-                buffer = Tensor({input.shape[0],input.shape[1], (weight.shape[0])}, input.dtype, input.device);
-            }
+    // Copy constructor
+    Linear(const Linear &other)
+    {
+        this->weight = other.weight;
+        this->range = other.range;
+        this->offset = other.offset;
+        this->quantized = other.quantized;
+        this->buffer = other.buffer;
+        this->bias = other.bias;
+        this->hasbias = other.hasbias;
+        this->bmm_size = other.bmm_size;
+        this->outshape = other.outshape;
+        this->inshape = other.inshape;
+        
+    }
+
+    // default copy assignment operator
+    Linear &operator=(const Linear &other) = default;
+
+    Tensor operator()(Tensor input)
+    {
+
+        if (buffer.data == nullptr || buffer.shape[1] * buffer.shape[2] < input.shape[0] * input.shape[1] || buffer.dtype != input.dtype || buffer.device != input.device)
+        {
+            buffer = Tensor({this->bmm_size, input.shape[0], input.shape[1], (outshape)}, input.dtype, input.device);
+        }
+
+        auto threadpool = get_threadpool();
+
+        if (!this->hasbias)
+        {
             buffer.empty();
-
-
-            if (this->quantized){
-                return this->weight.matmul(this->range, this->offset, input, buffer).cloneWithFalseReshape({input.shape[0],input.shape[1], weight.shape[0]});
-            }else{
-                return this->weight.matmul(input, buffer).cloneWithFalseReshape({input.shape[0],input.shape[1], weight.shape[0]});
-            }  
         }
-
-        Tensor operator()(Tensor input, Tensor residual) {
-          
-            
-            if (this->quantized){
-                return this->weight.matmul(this->range, this->offset, input, residual);
-            }else{
-                return this->weight.matmul(input, residual);
-            }  
-        }
-
-        void cuda(){
-            this->weight = this->weight.cuda();
-
-            if (this->quantized){
-                this->range = this->range.cuda();
-                this->offset = this->offset.cuda();
+        else
+        {
+            for (size_t bb = 0; bb < bmm_size; bb += 1)
+            {
+                for (size_t i = 0; i < input.shape[0]; i++)
+                {
+                    for (size_t j = 0; j < input.shape[1]; j++)
+                    {
+                        buffer[bb][i][j].copyfrom(this->bias[bb]);
+                    }
+                }
             }
+            //     threadpool->debug(this->bias,"time_decay");
 
-            // this->buffer = this->buffer.cuda();
-            // not needed, buffer will be recreated on device mismatch
+            // threadpool->sync();
+            //     threadpool->debug(this->buffer,"time_decay_buffer");
+            // threadpool->sync();
         }
 
+        if (this->quantized)
+        {
+            auto out = this->weight.matmul(this->range, this->offset, input, buffer);
+            if(bmm_size > 1){
+                return out.cloneWithFalseReshape({bmm_size,input.shape[0], input.shape[1], outshape});    
+            }
+            return out.cloneWithFalseReshape({input.shape[0], input.shape[1], outshape});
+        }
+        else
+        {
+            auto out = this->weight.matmul(input, buffer);
+            if(bmm_size > 1){
+                return out.cloneWithFalseReshape({bmm_size,input.shape[0], input.shape[1], outshape});    
+            }
+            return out.cloneWithFalseReshape({input.shape[0], input.shape[1], outshape});
+        }
+    }
+
+    Tensor operator()(Tensor input, Tensor residual)
+    {
+
+        if (this->quantized)
+        {
+            return this->weight.matmul(this->range, this->offset, input, residual);
+        }
+        else
+        {
+            return this->weight.matmul(input, residual);
+        }
+    }
+
+    void cuda()
+    {
+        this->weight = this->weight.cuda();
+
+        if (this->quantized)
+        {
+            this->range = this->range.cuda();
+            this->offset = this->offset.cuda();
+        }
+        if (this->hasbias)
+        {
+            this->bias = this->bias.cuda();
+        }
+
+        // this->buffer = this->buffer.cuda();
+        // not needed, buffer will be recreated on device mismatch
+    }
 };
 
 #endif
