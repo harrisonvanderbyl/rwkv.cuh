@@ -48,7 +48,7 @@ class TimeShift
         Tensor operator()(Tensor input){
 
             if (buffer.data == nullptr || buffer.shape[1] * buffer.shape[2] < input.shape[0] * input.shape[1] || buffer.dtype != input.dtype || buffer.device != input.device){
-                buffer = Tensor({time_mix.shape[0],input.shape[0],input.shape[1], input.shape[2]}, input.dtype, input.device);
+                buffer = *new Tensor({time_mix.shape[0],input.shape[0],input.shape[1], input.shape[2]}, input.dtype, input.device);
             }
 
             auto batches = input.shape[0];
@@ -70,11 +70,12 @@ class TimeShift
                 threadpool->debug(xx,"posttanh");
                 threadpool->sync();
                 auto outputb = this->time_maa_w2(xx);
+                threadpool->sync();
                 threadpool->debug(outputb,"posttmaa2");
-                this->time_mix.shift(input,outputb,this->state, this->dims, true);
-                
-                threadpool->debug(outputb,"posttimemaab");
-                return outputb;
+                return this->time_mix.shift(input,outputb,this->state, this->dims, true);
+                // threadpool->sync();
+                // threadpool->debug(outputb,"posttimemaab");
+                // return outputb;
 
             }
             else{

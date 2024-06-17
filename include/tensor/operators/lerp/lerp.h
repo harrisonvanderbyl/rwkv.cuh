@@ -8,7 +8,7 @@ CUDAONLY(lerp_cuda_kernel(void* inputdata, void* outputdata, void* mixdata, size
 CPUONLY(lerp_cpu_kernel(void* w, void* A, void* B, void* output, size_t size, size_t loopsize, TENSORTYPE dtype))
 
 
-inline Tensor Tensor::shift(Tensor& input, Tensor& output, Tensor& state, size_t indims, bool initiate_move){
+inline Tensor Tensor::shift(Tensor input, Tensor output, Tensor& state, size_t indims, bool initiate_move){
     auto batches = input.shape[0];
     auto seq = input.shape[1];
 

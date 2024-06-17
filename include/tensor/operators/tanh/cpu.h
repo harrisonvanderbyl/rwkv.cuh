@@ -13,12 +13,26 @@ void tanh_cpu_kernel(void *input, size_t size, TENSORTYPE dtype, size_t dims)
 
     auto pool = get_threadpool();
 
-    auto headsize = dims / pool->heads;
+    auto mheads = pool->heads;
+
+    while(dims%(mheads*8) !=0){
+        mheads -=1;
+    }
+
+    if(mheads == 0){
+        std::cout << "weird model, seek help\n";
+        exit(1);
+    }
+
+    auto headsize = dims / mheads;
+
+    pool->sync();
+
 
     if (dtype == TENSORTYPE::kFLOAT_32)
     {
 
-        for (size_t t = 0; t < pool->heads; t++)
+        for (size_t t = 0; t < mheads; t++)
         {
             pool->add_job([input, size, dims, simdwidth, t, headsize]
                           {
@@ -34,6 +48,7 @@ void tanh_cpu_kernel(void *input, size_t size, TENSORTYPE dtype, size_t dims)
     {
         throw std::runtime_error("tanh only implemented for float");
     }
+    pool->sync();
 }
 
 #endif // tanh_NAIVE_H

@@ -30,7 +30,7 @@ inline Tensor Tensor::matmul(Tensor &Art, Tensor &Aot,
     const auto B = Bt.data;
     if (Ct.data == nullptr)
     {
-        Ct = Tensor({Bt.shape[0], Bt.shape[1], this->shape[0]}, Bt.dtype, Bt.device, Bt.device_id);
+        Ct =* new Tensor({Bt.shape[0], Bt.shape[1], this->shape[0]}, Bt.dtype, Bt.device, Bt.device_id);
     }
     const auto C = Ct.data;
 

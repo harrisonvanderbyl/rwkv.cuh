@@ -441,6 +441,7 @@ struct Tensor
         }
         else
         {
+            
             auto err = posix_memalign(&this->data, 64, this->data_size_in_bytes);
             if(err){
                 std::cout << strerror(err) << "\n";
@@ -625,8 +626,8 @@ struct Tensor
     }
 
     Tensor relusquared();
-    Tensor &sigmoidmul(Tensor &other, Tensor &residual, Tensor &output);
-    Tensor shift(Tensor &input, Tensor &output, Tensor &state, size_t indims, bool initiate_move = false);
+    Tensor sigmoidmul(Tensor &other, Tensor &residual, Tensor &output);
+    Tensor shift(Tensor input, Tensor output, Tensor &state, size_t indims, bool initiate_move = false);
     Tensor swishmul(Tensor &other);
     Tensor matmul(Tensor &other, Tensor residual = Tensor());
     Tensor matmul(Tensor &Art, Tensor &Aot, Tensor &Bt, Tensor residual = Tensor());

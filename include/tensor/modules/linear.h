@@ -78,7 +78,7 @@ public:
 
         if (buffer.data == nullptr || buffer.shape[1] * buffer.shape[2] < input.shape[0] * input.shape[1] || buffer.dtype != input.dtype || buffer.device != input.device)
         {
-            buffer = Tensor({this->bmm_size, input.shape[0], input.shape[1], (outshape)}, input.dtype, input.device);
+            buffer = *new Tensor({this->bmm_size, input.shape[0], input.shape[1], (outshape)}, input.dtype, input.device);
         }
 
         auto threadpool = get_threadpool();
