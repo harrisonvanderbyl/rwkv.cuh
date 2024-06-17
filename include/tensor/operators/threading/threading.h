@@ -12,10 +12,35 @@
 #include <condition_variable>
 
 // each threadstream has a separate list of jobs
+class JobLinkItem{
+    std::function<void()> job;
+    
+    public:
+    std::atomic<JobLinkItem*> next = 0;
+    void addJob(JobLinkItem* job){
+        auto expect = (JobLinkItem*)nullptr;
+        if(! next.compare_exchange_strong(expect,job)){
+            next.load()->addJob(job);
+        }
+    }
+    JobLinkItem(std::function<void()> job){
+        this->job = job;
+    }
+
+    JobLinkItem* doJob(){
+        this->job();
+
+        while(!this->next.load()){
+            // std::this_thread::sleep_for(std::chrono::microseconds(1));
+            std::this_thread::yield();
+        }
+        return this->next.load();
+    }
+};
 class ThreadStream
 {
 public:
-    std::vector<std::function<void()>> jobs;
+    std::atomic<JobLinkItem*> joblist = nullptr;
     std::mutex mtx;
     std::condition_variable cv;
     std::atomic<bool> done = false;
@@ -38,34 +63,32 @@ public:
     void stop()
     {
         this->done = true;
-        this->cv.notify_all();
         this->thread->join();
     }
 
     void add_job(std::function<void()> job)
     {
-        std::unique_lock<std::mutex> lck(this->mtx);
-        this->jobs.push_back(job);
-        this->cv.notify_all();
+        auto createdJob = new JobLinkItem(job);
+
+        this->joblist.load()->addJob(createdJob);
+
     }
 
     void run()
     {
-        while (!this->done)
-        {
-            std::function<void()> job;
-            {
-                std::unique_lock<std::mutex> lck(this->mtx);
-                this->cv.wait(lck, [this]
-                              { return !this->jobs.empty() || this->done; });
-                if (this->jobs.empty())
-                {
-                    continue;
-                }
-                job = this->jobs.front();
-                this->jobs.erase(this->jobs.begin());
-            }
-            job();
+        this->joblist.store(
+            new JobLinkItem([](){
+                std::cout << "Thread started";
+            }));
+
+        auto next = this->joblist.load()->doJob();
+
+        while(next){
+
+            joblist.store(next);
+
+            next = next->doJob();
+
         }
     }
 };

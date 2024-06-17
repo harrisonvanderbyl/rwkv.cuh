@@ -50,7 +50,7 @@ void normalize_cpu_kernel(void *input, void *weight, void *bias, void *output, f
 
                             float vareps = sqrt(var + eps);
 
-                            for (size_t j = i; j < i + std::min(newheadshape,headshape); j += simdwidth)
+                            for (size_t j = i; j < (i + std::min(newheadshape,headshape)); j += simdwidth)
                             {
                                 simd_norm_assign(flp(input) + j, mean, vareps, flp(weight) + (j % lastshape), flp(bias) + (j % lastshape), flp(output) + j);
                             }

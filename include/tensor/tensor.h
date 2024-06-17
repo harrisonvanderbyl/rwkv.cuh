@@ -441,10 +441,12 @@ struct Tensor
         }
         else
         {
-            posix_memalign(&this->data, 64, this->data_size_in_bytes);
+            auto err = posix_memalign(&this->data, 64, this->data_size_in_bytes);
+            if(err){
+                std::cout << strerror(err) << "\n";
+                exit(err);
+            }
             // RcudaMallocHost(&this->data,this->data_size_in_bytes);
-
-            assert(this->data != nullptr);
 
             // fill with zeros
             memset(this->data, 0, this->data_size_in_bytes);
@@ -630,7 +632,7 @@ struct Tensor
     Tensor matmul(Tensor &Art, Tensor &Aot, Tensor &Bt, Tensor residual = Tensor());
     Tensor normalize(const Tensor &weight, const Tensor &bias, const Tensor &result, size_t heads = 1, float epsilon = 1e-5);
 
-    Tensor& tanh();
+    Tensor tanh();
     Tensor wkv5(Tensor &r, Tensor &k, Tensor &v, Tensor &w, Tensor &u, Tensor &y);
 
     Tensor operator[](size_t index);

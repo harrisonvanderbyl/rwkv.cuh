@@ -84,7 +84,8 @@ void inline  simd_norm_assign(float *input, float mean, float vareps, float *wei
 float inline  dot_uint8_floats(uint8_t *input, float *other, size_t size)
 {
     auto zz1 = _mm256_setzero_ps();
-
+    
+    
     for (auto k = 0; k < size; k += get_simd_width())
     {
         zz1 = _mm256_fmadd_ps(_mm256_cvtepi32_ps(_mm256_cvtepu8_epi32(_mm_lddqu_si128((__m128i *)(input + k)))), _mm256_load_ps(other + k), zz1);

@@ -8,7 +8,7 @@
 CPUONLY(tanh_cpu_kernel(void* input, size_t size, TENSORTYPE dtype, size_t dims));
 CUDAONLY(tanh_cuda_kernel(void* input, size_t size, TENSORTYPE dtype))
 
-inline Tensor& Tensor::tanh(){
+inline Tensor Tensor::tanh(){
     
     size_t size = this->get_element_count();
     if(size == 0){

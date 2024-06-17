@@ -43,15 +43,11 @@ void matmul_cpu_kernal(void *A, void *B, void *C, size_t BBT, size_t INSHAPE, si
     ThreadPool *pool = get_threadpool();
 
     // std::cout << INSHAPE<<"<in->out>" << OUTSHAPE << "\n";
-    
 
     auto headsize = (OUTSHAPE) / pool->heads;
     auto headsnum = pool->heads;
-
-    if(headsize%get_simd_width()){
-        headsnum = OUTSHAPE / get_simd_width();
-        headsize = get_simd_width();
-    }
+    // assert((headsize % get_simd_width()) == 0);
+    
     // assert((headsize%get_simd_width()) == 0); // use different thread counts, try a different amount of threads, ie 4 for 1b5 should work
     for (size_t head = 0; head < headsnum; head++)
     {
@@ -75,9 +71,6 @@ void matmul_cpu_kernal(void *A, void *B, void *C, size_t BBT, size_t INSHAPE, si
             head);
     }
 
-    if(headsnum!=pool->heads){
-        pool->sync();
-    }
 }
 
 void wkv5_cpu_kernel(void *kk, void *vv, void *ww, void *uu, void *rr, void *ss, void *out, size_t T, size_t B, size_t C, size_t H, TENSORTYPE dtype)
