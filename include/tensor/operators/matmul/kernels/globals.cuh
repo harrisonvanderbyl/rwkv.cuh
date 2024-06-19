@@ -16,5 +16,11 @@
 const static int WARPSIZE = 32; // warpSize is not constexpr
 // #define BLOCKSPLIT 8
 
+struct bfloat1624
+{
+  __nv_bfloat162 x = __float2bfloat162_rn(0.0f);
+  __nv_bfloat162 y = __float2bfloat162_rn(0.0f);
+};
+
 
 #endif // GLOBALCUDA_H

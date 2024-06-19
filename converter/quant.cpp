@@ -6,8 +6,8 @@
 void Quantize(torch::Tensor &At, torch::Tensor &Art, torch::Tensor &Aot, torch::Tensor &Aqt, int64_t M, int64_t N, bool addResiduals = true)
 {
     float *A = At.data_ptr<float>();
-    float *Ar = Art.data_ptr<float>();
-    float *Ao = Aot.data_ptr<float>();
+    double *Ar = Art.data_ptr<double>();
+    double *Ao = Aot.data_ptr<double>();
     uint8_t *Aq = Aqt.data_ptr<uint8_t>();
 
     int64_t i, j;
@@ -26,7 +26,8 @@ void Quantize(torch::Tensor &At, torch::Tensor &Art, torch::Tensor &Aot, torch::
         double range = (max - min);
         uint BITS = 255;
         double scale = (range/BITS);
-        *(Ar + i)= scale;
+        double rangehelp = (1e44*7.13624);
+        *(Ar + i)= scale;// * rangehelp;
         *(Ao + i)= min;
 
         // float diff = 0.0;

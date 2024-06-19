@@ -4,14 +4,14 @@
 #include "tensor/tensor.h"
 #include "tensor/intrinsics/intrinsics.h"
 
-void lerp_cpu_kernel(void *w, void *A, void *B, void *output, size_t size, size_t loopsize, TENSORTYPE dtype)
+void lerp_cpu_kernel(void *w, void *A, void *B, void *output, size_t size, TENSORTYPE dtype)
 {
     size_t simdwidth = get_simd_width();
     if (dtype == TENSORTYPE::kFLOAT_32)
     {
         for (size_t i = 0; i < size; i+=simdwidth)
         {
-            float* weight = flp(w) + (i % loopsize);
+            float* weight = flp(w) + (i);
             simd_lerp(flp(A) + i, flp(B) + i, weight, flp(output) + i);
         }
     }

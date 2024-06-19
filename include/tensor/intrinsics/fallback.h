@@ -30,7 +30,7 @@ float __attribute__((weak)) reduce_float(float xx)
 
 void __attribute__((weak)) simd_swishmul(float *input, float *other, float *output)
 {
-    (*output = ((*(float *)other * *(float *)input) / ((1.0f) + simdexpfallback(*(float *)input))));
+    (*output = ((*(float *)other * *(float *)input) / ((1.0f) + exp(*(float *)input))));
 }
 
 void __attribute__((weak)) simd_relusquare(float *input, float *output)

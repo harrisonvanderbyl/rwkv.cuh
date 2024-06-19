@@ -5,7 +5,7 @@
 #include "tensor/tensor.h"
 
 
-CPUONLY(tanh_cpu_kernel(void* input, size_t size, TENSORTYPE dtype, size_t dims));
+CPUONLY(tanh_cpu_kernel(void* input, size_t size, TENSORTYPE dtype));
 CUDAONLY(tanh_cuda_kernel(void* input, size_t size, TENSORTYPE dtype))
 
 inline Tensor Tensor::tanh(){
@@ -15,7 +15,7 @@ inline Tensor Tensor::tanh(){
         return *this;
     }
     if (this->device == DEVICE::CPU){
-        tanh_cpu_kernel(this->data, size, dtype, this->shape[2]);
+        tanh_cpu_kernel(this->data, size, dtype);
     }
     else
     {

@@ -62,16 +62,16 @@ for key in tqdm.tqdm(keys):
             weight = ww.float().clone().cpu()
             
             model[key] = (torch.zeros(weight.shape[1],weight.shape[0]).to(torch.uint8))
-            model[key+".range"] = (torch.zeros(weight.shape[1]))
-            model[key+".zero"] = (torch.zeros(weight.shape[1]))
+            model[key+".range"] = (torch.zeros(weight.shape[1], dtype=torch.float64))
+            model[key+".zero"] = (torch.zeros(weight.shape[1], dtype=torch.float64))
             
             #if("output" not in key and 'ffn.receptance' not in key):
             mww = weight.t().contiguous()
             
             quant_cpp.quantize_cpu(mww, model[key+".range"] , model[key+".zero"],model[key], weight.shape[1], weight.shape[0], True)
             
-            model[key+".range"]  = model[key+".range"].bfloat16()
-            model[key+".zero"]  = model[key+".zero"].bfloat16()
+            model[key+".range"]  = model[key+".range"].double()
+            model[key+".zero"]  = model[key+".zero"].double()
             
             # model[key] = model.pop(key).t().contiguous().cpu()
         else:
@@ -89,26 +89,28 @@ for key in tqdm.tqdm(keys):
 n_layer, n_embd, vocab_size, headsize, dim_ffn, n_head, is_v6 = get_model_layout(model)
 zm1 = torch.zeros(0,n_embd)
 zm2 = torch.zeros(n_embd,0)
+zm1w = torch.zeros(1,n_embd)
+zm2w = torch.zeros(n_embd,1)
+zm4 = torch.zeros(5,n_embd,0)
+zm3 = torch.zeros(2,n_embd,0)
 for i in range(n_layer):
 
+    model[f"blocks.{i}.ffnshift.time_mix_x"] = torch.zeros(1,n_embd)
+    model[f"blocks.{i}.ffnshift.time_mix_w1.weight"] = zm1
+    model[f"blocks.{i}.ffnshift.time_mix_w2.weight"] = zm3
+    maamix = "maa" if is_v6 else "mix"
+    model[f"blocks.{i}.ffnshift.time_mix_w2.bias"] = torch.stack([model.pop(f"blocks.{i}.ffn.time_{maamix}_{j}") for j in "kr"]).reshape(2,-1)
+    model[f"blocks.{i}.att.w2.bias"] = model.pop(f"blocks.{i}.att.time_decay").reshape(n_embd).float().cpu()
     if(not is_v6):
-        model[f"blocks.{i}.attshift.time_mix"] = torch.stack(([model.pop(f"blocks.{i}.att.time_mix_{j}") for j in "kvrg"]*2)[-5:]).reshape(5,-1)
-        model[f"blocks.{i}.att.w1.weight"] = zm1
-        model[f"blocks.{i}.att.w2.weight"] = zm2
-        model[f"blocks.{i}.att.w2.bias"] = model.pop(f"blocks.{i}.att.time_decay").reshape(n_embd).float().cpu()
-        model[f"blocks.{i}.ffnshift.time_mix"] = torch.stack([model.pop(f"blocks.{i}.ffn.time_mix_{j}") for j in "kr"]).reshape(2,-1)
-        
-    else:
-        model[f"blocks.{i}.ffnshift.time_mix"] = torch.stack([model.pop(f"blocks.{i}.ffn.time_maa_{j}") for j in "kr"]).reshape(2,-1)
-        model[f"blocks.{i}.attshift.time_mix_x"] = torch.stack([model.pop(f"blocks.{i}.att.time_maa_{j}") for j in "x"]).reshape(1,-1)
-        model[f"blocks.{i}.attshift.time_mix"] = torch.stack([model.pop(f"blocks.{i}.att.time_maa_{j}") for j in "wkvrg"]).reshape(5,-1)
-        # model[f"blocks.{i}.attshift.time_mix_w1.weight"]
-        model[f"blocks.{i}.att.w1.weight"] =model.pop(f"blocks.{i}.att.time_decay_w1").t().contiguous()
-        model[f"blocks.{i}.att.w2.weight"] = model.pop(f"blocks.{i}.att.time_decay_w2").t().contiguous()
-        model[f"blocks.{i}.att.w2.bias"] = model.pop(f"blocks.{i}.att.time_decay").reshape(n_embd).float().cpu()
-        print(model[f"blocks.{i}.att.time_maa_w1"].shape)
-        model[f"blocks.{i}.attshift.time_mix_w2.weight"] = model.pop(f"blocks.{i}.att.time_maa_w2").transpose(1,2).contiguous()
-        model[f"blocks.{i}.attshift.time_mix_w1.weight"] = model.pop(f"blocks.{i}.att.time_maa_w1").transpose(0,1).contiguous()
+        model[f"blocks.{i}.att.w2.bias"] = model[f"blocks.{i}.att.w2.bias"].double().exp().neg().exp().float()
+
+    model[f"blocks.{i}.att.w1.weight"] = model.pop(f"blocks.{i}.att.time_decay_w1").t().contiguous() if is_v6 else zm1
+    model[f"blocks.{i}.att.w2.weight"] = model.pop(f"blocks.{i}.att.time_decay_w2").t().contiguous() if is_v6 else zm2
+    model[f"blocks.{i}.attshift.time_mix_x"] = model.pop(f"blocks.{i}.att.time_maa_x").reshape(1,-1) if is_v6 else torch.zeros(1,n_embd)
+    model[f"blocks.{i}.attshift.time_mix_w1.weight"] = model.pop(f"blocks.{i}.att.time_maa_w1").transpose(0,1).contiguous() if is_v6 else zm1
+    model[f"blocks.{i}.attshift.time_mix_w2.weight"] = model.pop(f"blocks.{i}.att.time_maa_w2").transpose(1,2).contiguous() if is_v6 else zm4
+    model[f"blocks.{i}.attshift.time_mix_w2.bias"] = torch.stack(([model.pop(f"blocks.{i}.att.time_{maamix}_{j}") for j in ("wkvrg" if is_v6 else "kvrg") ]*2)[-5:]).reshape(5,-1)
+    
 
 # create ../build/ if not exists
 import os

@@ -32,9 +32,12 @@ class JobLinkItem{
 
         while(!this->next.load()){
             // std::this_thread::sleep_for(std::chrono::microseconds(1));
+            // std::this_thread::sleep_for();
             std::this_thread::yield();
         }
+        // std::cout << "Thread #" << std::this_thread::get_id() << ": on CPU " << sched_getcpu() << "\n";
         return this->next.load();
+
     }
 };
 class ThreadStream
@@ -54,10 +57,17 @@ public:
     {
     }
 
-    void start()
+    void start(size_t i)
     {
         this->running = true;
+        
         this->thread = new std::thread(&ThreadStream::run, this);
+
+        cpu_set_t cpuset;
+        CPU_ZERO(&cpuset);
+        CPU_SET(i, &cpuset);
+        int rc = pthread_setaffinity_np(this->thread->native_handle(),
+                                        sizeof(cpu_set_t), &cpuset);
     }
 
     void stop()
@@ -160,7 +170,7 @@ public:
     {
         for (size_t i = 0; i < this->streams.size(); i++)
         {
-            this->streams[i].start();
+            this->streams[i].start(i);
         }
     }
 

@@ -41,12 +41,12 @@ public:
         this->receptance = Linear(model, prefix + "receptance");
         this->key = Linear(model, prefix + "key");
         this->value = Linear(model, prefix + "value");
-        this->gate = Linear(model, prefix + "gate");
+        this->gate = Linear(model, prefix + "gate", SWISHMUL);
         this->output = Linear(model, prefix + "output");
         this->ln_x = LayerNorm(model[prefix + "ln_x.weight"], model[prefix + "ln_x.bias"], n_head, 64e-5);
 
-        this->w1 = Linear(model, prefix + "w1");
-        this->w2 = Linear(model, prefix + "w2");
+        this->w1 = Linear(model, prefix + "w1", TANH);
+        this->w2 = Linear(model, prefix + "w2", EXPNEGEXP);
     }
 
     Tensor operator()(Tensor input, Tensor &residual)
@@ -65,14 +65,15 @@ public:
 
         auto cbuf = buffer.cloneWithFalseReshape({input.shape[1], input.shape[2], input.shape[3]});
 
+        pool->debug(input[0], "time_decay_att_in");
         auto ww = this->w1(input[0]);
 
+        pool->debug(input[0], "time_decay_att_pw1");
+        // auto www = ww.tanh();
         pool->sync();
 
-        auto www = ww.tanh();
-        pool->sync();
+        auto w = this->w2(ww);
 
-        auto w = this->w2(www);
         pool->debug(w, "time_decay");
 
         pool->sync();
@@ -98,17 +99,12 @@ public:
         pool->debug(xxa, "start xxa");
 
         check_for_errors();
-        auto gv = this->gate(input[4]);
+        pool->sync();
+        auto gv = this->gate(input[4], xxa);
         pool->debug(gv, "start gv");
 
-        check_for_errors();
-
-        auto gvo = gv.swishmul(xxa);
-        pool->debug(gvo, "start gvo");
-
-        check_for_errors();
         pool->sync();
-        auto out = this->output(gvo, residual);
+        auto out = this->output(gv, residual);
         pool->debug(out, "start out");
 
         check_for_errors();

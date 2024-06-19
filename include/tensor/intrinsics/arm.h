@@ -81,7 +81,7 @@ float reduce_float(float32x4_t xx)
 void simd_lerp(float *input, float *other, float *weighti, float *output)
 {
     // arm neon
-    auto weight = vaddq_f32(vld1q_f32(weight),vld1q_f32(output));
+    auto weight = (vld1q_f32(weighti));
     float32x4_t v1 = vld1q_f32(input);
     float32x4_t v2 = vsubq_f32(vdupq_n_f32(1.0f), weight);
     float32x4_t v3 = vmulq_f32(v1, v2);
@@ -161,7 +161,7 @@ inline const void simd_wkv(size_t B, size_t T,size_t H,size_t Z, size_t bb,size_
             auto kv = vmulq_f32(vld1q_f32(k+j), vdupq_n_f32(v[i]));
             auto sss = vld1q_f32(s+i*Z+j);
             acc = vmlaq_f32(acc, vmlaq_f32(sss,vld1q_f32(u+j) , kv),vld1q_f32(r+j));
-            vst1q_f32(s+i*Z+j, vmlaq_f32(kv,arm_exp(vnegq_f32(arm_exp((vld1q_f32(w+j))))),sss));
+            vst1q_f32(s+i*Z+j, vmlaq_f32(kv,((((vld1q_f32(w+j))))),sss));
 
         }
 

@@ -19,44 +19,30 @@ class FeedForward
 
             
 
-            this->receptance = Linear(model, prefix + "receptance");
-            this->key = Linear(model, prefix + "key");
-            this->value = Linear(model, prefix + "value");
+            this->receptance = Linear(model, prefix + "receptance", SIGMOIDMUL);
+            this->key = Linear(model, prefix + "key", RELUSQUARE);
+            this->value = Linear(model, prefix + "value",SETVALUE);
         }
         void operator()(Tensor input, Tensor residual, Tensor output){
 
             auto pool = get_threadpool();
+
+            check_for_errors();
             
             pool->debug(input[0], "ffn input k");
             pool->debug(input[1], "ffn input r");
 
-            pool->sync();
             auto k = key(input[0]);
-
-            check_for_errors();
-            auto r = receptance(input[1]);
-
             pool->debug(k, "ffn k");
+            pool->sync();
+            auto v = value(k, input[0]); 
+             pool->debug(v, "ffn v");
+
+
+            auto r = receptance(input[1],residual);
             pool->debug(r, "ffn r");
 
-            check_for_errors();
-            auto krs = k.relusquared();
-
-            pool->debug(krs, "ffn krs");
-
-            check_for_errors();
-            pool->sync();
-            auto v = this->value(krs); 
-
-            pool->debug(v, "ffn v");
             
-            check_for_errors();
-            r.sigmoidmul(v, residual, output);
-
-            pool->debug(output, "ffn output");
-
-            check_for_errors();
-
         }
 
 };

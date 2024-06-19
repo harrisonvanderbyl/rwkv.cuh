@@ -10,7 +10,7 @@
 
 #include "tensor/operators/threading/threading.h"
 
-void matmul8_cpu_kernal(uint8_t *A, void *B, void *C, void *Ao, void *Ar, size_t BBT, size_t INSHAPE, size_t OUTSHAPE)
+void matmul8_cpu_kernal(uint8_t *A, void *B, void *C, void *Ao, void *Ar, size_t BBT, size_t INSHAPE, size_t OUTSHAPE, MMACTFUNC func)
 {
 
     ThreadPool *pool = get_threadpool();
@@ -19,26 +19,52 @@ void matmul8_cpu_kernal(uint8_t *A, void *B, void *C, void *Ao, void *Ar, size_t
     for (size_t head = 0; head < pool->heads; head++)
     {
         pool->add_job(
-            [A, B, C, Ao, Ar, BBT, INSHAPE, OUTSHAPE, headsize, head]()
+            [A, B, C, Ao, Ar, BBT, INSHAPE, OUTSHAPE, headsize, head, func]()
             {
                 for (size_t bbt = 0; bbt < BBT; bbt += 1)
                 {
                     float ss2f = sum_floats(flp(B) + bbt * INSHAPE, INSHAPE);
 
                     const auto BAINSHAPE = flp(B) + bbt * INSHAPE;
-
+                    auto spot =flp(C) + bbt * OUTSHAPE;
                     for (size_t b = head*headsize; b < (head + 1)*headsize; b += 1)
                     {
-                        auto zz1 = dot_uint8_floats(A + b*INSHAPE, BAINSHAPE, INSHAPE);
 
-                        (flp(C) + bbt * OUTSHAPE)[b] += ss2f * bfloat16_to_float32(bflp(Ao)[b]) + zz1 * bfloat16_to_float32(bflp(Ar)[b]);
+
+                        double zz1 = dot_uint8_floats(A + b*INSHAPE, BAINSHAPE, INSHAPE);
+                        
+                        zz1 = ss2f * (((double*)(Ao))[b]) + zz1 * (((double*)(Ar))[b]);
+                        if(func == TANH){
+                            auto ax = exp(spot[b]+ zz1);
+                            auto bx = exp(-(spot[b]+zz1));
+                            spot[b] = (ax-bx)/(ax+bx);
+                        }
+                        if(func == RELUSQUARE){
+                            spot[b] += zz1;
+                            spot[b] = (spot[b]*fmaxf(spot[b],0.0f));
+                        }
+                        if(func == SWISHMUL){
+                            spot[b] = (spot[b] * zz1)/(1.0 + exp(-zz1));
+                        }
+                        if(func == SIGMOIDMUL){
+                            spot[b] = ((flp(B)-BBT*INSHAPE + bbt*OUTSHAPE)[b])/(1.0 + exp(-zz1)) + spot[b];
+                        }
+                        if(func == NONE){
+                            spot[b] += zz1;
+                        }
+                        if(func == EXPNEGEXP){
+                            spot[b] = exp(-exp(zz1+spot[b]));
+                        }
+                        if(func == SETVALUE){
+                            spot[b] = zz1;
+                        }
                     }
                 } },
             head);
     }
 }
 
-void matmul_cpu_kernal(void *A, void *B, void *C, size_t BBT, size_t INSHAPE, size_t OUTSHAPE, TENSORTYPE dtype, size_t bmmshape)
+void matmul_cpu_kernal(void *A, void *B, void *C, size_t BBT, size_t INSHAPE, size_t OUTSHAPE, TENSORTYPE dtype, size_t bmmshape, MMACTFUNC func)
 {
     ThreadPool *pool = get_threadpool();
 
@@ -47,30 +73,54 @@ void matmul_cpu_kernal(void *A, void *B, void *C, size_t BBT, size_t INSHAPE, si
     auto headsize = (OUTSHAPE) / pool->heads;
     auto headsnum = pool->heads;
     // assert((headsize % get_simd_width()) == 0);
-    
+
     // assert((headsize%get_simd_width()) == 0); // use different thread counts, try a different amount of threads, ie 4 for 1b5 should work
     for (size_t head = 0; head < headsnum; head++)
     {
         pool->add_job(
-            [A, B, C, BBT, INSHAPE, OUTSHAPE, headsize, head, bmmshape]()
+            [A, B, C, BBT, INSHAPE, OUTSHAPE, headsize, head, bmmshape, func]()
             {
                 for (size_t bbt = 0; bbt < BBT; bbt += 1)
                 {
                     for (size_t bmmindex = 0; bmmindex < bmmshape; bmmindex += 1){
 
                     const auto BAINSHAPE = flp(B) + bbt * (INSHAPE*bmmshape) + bmmindex * INSHAPE;
-
+                    auto spot = flp(C) + bmmindex * BBT * OUTSHAPE + bbt * OUTSHAPE;
                     for (size_t b = head*headsize; b < (head + 1)*headsize; b += 1)
                     {
-                        auto zz1 = dot_floats(flp(A) + b*INSHAPE + bmmindex * INSHAPE*OUTSHAPE, BAINSHAPE, INSHAPE);
-
-                        (flp(C) + bmmindex * BBT * OUTSHAPE + bbt * OUTSHAPE)[b] +=  zz1;
+                        double zz1 = dot_floats(flp(A) + b*INSHAPE + bmmindex * INSHAPE*OUTSHAPE, BAINSHAPE, INSHAPE);
+                        
+                        // spot[b] =  zz1;
+                        if(func == TANH){
+                            auto ax = exp(spot[b]+zz1);
+                            auto bx = exp(-(spot[b]+zz1));
+                            spot[b] = (ax-bx)/(ax+bx);
+                        }
+                        if(func == RELUSQUARE){
+                            spot[b] += zz1;
+                            spot[b] = (spot[b]*fmaxf(spot[b],0.0f));
+                        }
+                        if(func == SWISHMUL){
+                            spot[b] = (spot[b] * zz1)/(1.0 + exp(-zz1));
+                        }
+                        if(func == SIGMOIDMUL){
+                            spot[b] = ((flp(B)-BBT*INSHAPE + bbt*OUTSHAPE)[b])/(1.0 + exp(-zz1)) + spot[b];
+                        }
+                        if(func == SETVALUE){
+                            spot[b] = zz1;
+                        }
+                        if(func == NONE){
+                            spot[b] += zz1;
+                        }
+                        if(func == EXPNEGEXP){
+                            spot[b] = exp(-exp(zz1+spot[b]));
+                        }
+                        
                     }
                     }
                 } },
             head);
     }
-
 }
 
 void wkv5_cpu_kernel(void *kk, void *vv, void *ww, void *uu, void *rr, void *ss, void *out, size_t T, size_t B, size_t C, size_t H, TENSORTYPE dtype)

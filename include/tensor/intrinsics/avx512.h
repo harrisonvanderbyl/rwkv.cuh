@@ -70,7 +70,7 @@ float inline simd_variance_acc(float *input, float mean)
 
 void inline simd_lerp(float *input, float *other, float *weighti, float *output)
 {
-    auto weight = _mm512_add_ps(_mm512_loadu_ps(weighti),_mm512_loadu_ps(output));
+    auto weight = (_mm512_loadu_ps(weighti));
     _mm512_storeu_ps(output, _mm512_add_ps(_mm512_mul_ps(_mm512_loadu_ps(input), _mm512_sub_ps(_mm512_set1_ps(1.0f), weight)), _mm512_mul_ps(_mm512_loadu_ps(other), weight)));
 }
 
@@ -128,7 +128,7 @@ void inline simd_wkv(size_t B, size_t T,size_t H,size_t Z, size_t bb,size_t tt, 
             auto kv = _mm512_loadu_ps(k+j) * v[i];
             auto sss = _mm512_loadu_ps(s+i*Z+j);
             acc = _mm512_fmadd_ps(_mm512_fmadd_ps(kv,_mm512_loadu_ps(u+j) , sss),_mm512_loadu_ps(r+j),acc);
-            _mm512_store_ps(s+i*Z+j, _mm512_fmadd_ps(sss,simdexp512(simdneg(simdexp512((_mm512_loadu_ps(w+j))))),kv));
+            _mm512_store_ps(s+i*Z+j, _mm512_fmadd_ps(sss,((((_mm512_loadu_ps(w+j))))),kv));
 
         }
 

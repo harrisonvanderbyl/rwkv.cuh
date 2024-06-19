@@ -36,8 +36,6 @@
 #define WSUBM4 WM4 / WMITER // 8/2=4
 // const int WARPSIZE = 32; // warpSize is not constexpr
 
-struct bfloat1624;
-
 // __fmaf_rn((a.x), (b.x), (c.x)), __fmaf_rn((a.y), (b.y), (c.y)), __fmaf_rn((a.z), (b.z), (c.z)), __fmaf_rn((a.w), (b.w), (c.w)) \
 
 #define bf16fma(a, b, c) asm("{fma.rn.bf16x2 %0,%1,%2,%3;\n}" : "=r"(*c) : "r"(__BFLOAT162_TO_CUI(a)), "r"(__BFLOAT162_TO_CUI(b)), "r"(*c));
@@ -54,7 +52,7 @@ struct bfloat1624;
 // host
 namespace wt
 {
-  __device__ void loadFromGmem8(int N, int K, const float *A, const float *maxA, const uint8_t *B, const uint8_t *OB, bfloat1624 *range, bfloat1624 *off,
+  __device__ void loadFromGmem8(int N, int K, const float *A, const float *maxA, const uint8_t *B, const uint8_t *OB, double4 *range, double4 *off,
                                 float *As, float4 *Bs, int innerRowA, int innerColA,
                                 int innerRowB, int innerColB)
   {
@@ -83,13 +81,15 @@ namespace wt
 
       auto bbs = Bs + (innerRowB + offset) * BN4 + innerColB;
 
-      auto bbsx = bfloat1624({__float22bfloat162_rn(make_float2(OB[start], OB[start + K * 1])), __float22bfloat162_rn(make_float2(OB[start + K * 2], OB[start + K * 3]))});
+      auto bbsx = make_float4(OB[start], OB[start + K * 1],OB[start + K * 2], OB[start + K * 3]);
       bbsx.x = bbsx.x * range[innerColB].x + off[innerColB].x;
       bbsx.y = bbsx.y * range[innerColB].y + off[innerColB].y;
-      bbs[0].x = bbsx.x.x;
-      bbs[0].y = bbsx.x.y;
-      bbs[0].z = bbsx.y.x;
-      bbs[0].w = bbsx.y.y;
+      bbsx.z = bbsx.z * range[innerColB].z + off[innerColB].z;
+      bbsx.w = bbsx.w * range[innerColB].w + off[innerColB].w;
+      bbs[0].x = bbsx.x;
+      bbs[0].y = bbsx.y;
+      bbs[0].z = bbsx.z;
+      bbs[0].w = bbsx.w;
 
       // asm("ld.global.v4.f32 {%0, %1, %2, %3}, [%4];"
       //     : "=f"(Bs[(innerRowB + offset) * BN + innerColB * 4 + 0]),
@@ -179,14 +179,15 @@ namespace wt
  * @tparam TN The per-thread tile size for N dimension.
  */
 __global__ void __launch_bounds__(NUM_THREADS)
-    sgemmWarptiling8(int M, int N, int K, float *A, uint8_t *B, bfloat1624 *range, bfloat1624 *off,
-                     float *C)
+    sgemmWarptiling8(int M, int N, int K, float *A, uint8_t *B, double4 *range, double4 *off,
+                     float *C, MMACTFUNC func)
 {
   const uint cRow = blockIdx.y;
   const uint cCol = blockIdx.x;
   const float *maxc = C + M * N;
   const float *maxA = A + M * K;
   const uint8_t *OB = B;
+  auto AO = A;
 
   // Placement of the warp in the threadblock tile
   const uint warpIdx = threadIdx.x / WARPSIZE; // the warp this thread is in
@@ -262,20 +263,57 @@ __global__ void __launch_bounds__(NUM_THREADS)
       {
 
 #pragma unroll
-        for (uint resIdxN = 0; resIdxN < TN4; resIdxN += 1)
+        for (uint resIdxN = 0; resIdxN < TN; resIdxN += 1)
         {
 
-          auto iix = C + (cRow * BM + warpRow * WM + threadRowInWarp * TM + wSubRowIdx * WSUBM + resIdxM) * N + cCol * BN + warpCol * WN + wSubColIdx * WSUBN + threadColInWarp * TN + resIdxN * 4;
+          auto iix = C + (cRow * BM + warpRow * WM + threadRowInWarp * TM + wSubRowIdx * WSUBM + resIdxM) * N + cCol * BN + warpCol * WN + wSubColIdx * WSUBN + threadColInWarp * TN + resIdxN;
           if (iix < maxc)
           {
-            auto iiy = (float4 *)(((float *)threadResults4) + (wSubRowIdx * TM + resIdxM) * (WNITER * TN) + wSubColIdx * TN + resIdxN * 4);
+            auto zz1 = *(((float *)threadResults4) + (wSubRowIdx * TM + resIdxM) * (WNITER * TN) + wSubColIdx * TN + resIdxN);
 
-            auto iixh = reinterpret_cast<float4 *>(iix);
+            auto spot = (iix);
 
-            iixh->x += iiy->x;
-            iixh->y += iiy->y;
-            iixh->z += iiy->z;
-            iixh->w += iiy->w;
+            // iixh->x += iiy->x;
+            // iixh->y += iiy->y;
+            // iixh->z += iiy->z;
+            // iixh->w += iiy->w;
+
+            if (func == TANH)
+            {
+              spot[0] = tanh(spot[0] + zz1);
+            }
+            if (func == RELUSQUARE)
+            {
+              spot[0] += zz1;
+              if (spot[0] > 0)
+              {
+                spot[0] = spot[0] * spot[0];
+              }
+              else
+              {
+                spot[0] = 0;
+              }
+            }
+            if (func == SWISHMUL)
+            {
+              spot[0] = (spot[0] * zz1) / (1.0 + exp(-zz1));
+            }
+            if (func == SIGMOIDMUL)
+            {
+              spot[0] = (*((iix - C) + AO + (- N * M))) / (1.0 + exp(-zz1)) + spot[0];
+            }
+            if (func == NONE)
+            {
+              spot[0] += zz1;
+            }
+            if (func == EXPNEGEXP)
+            {
+              spot[0] = exp(-exp(zz1 + spot[0]));
+            }
+            if (func == SETVALUE)
+            {
+              spot[0] = zz1;
+            }
           }
         }
       }
@@ -283,7 +321,7 @@ __global__ void __launch_bounds__(NUM_THREADS)
   }
 }
 
-void runSgemmWarptiling8(int M, int N, int K, float *A, uint8_t *B, bfloat1624 *range, bfloat1624 *off, float *C)
+void runSgemmWarptiling8(int M, int N, int K, float *A, uint8_t *B, double4 *range, double4 *off, float *C, MMACTFUNC func)
 {
   // Settings for A100
 
@@ -320,7 +358,7 @@ void runSgemmWarptiling8(int M, int N, int K, float *A, uint8_t *B, bfloat1624 *
                 "BN*BK must be a multiple of 4*256 to vectorize loads");
 
   dim3 gridDim(CEIL_DIV(N, BN), CEIL_DIV(M, BM));
-  sgemmWarptiling8<<<gridDim, blockDim>>>(M, N, K, A, B, range, off, C);
+  sgemmWarptiling8<<<gridDim, blockDim>>>(M, N, K, A, B, range, off, C, func);
 
   cudaDeviceSynchronize();
   // get error
@@ -352,7 +390,7 @@ __global__ void kernelc_mm8_one(
 
   r += blockIdx.x * 32;
   o += blockIdx.x * 32;
-  w += outstart * INPUTSIZE + instart ;
+  w += outstart * INPUTSIZE + instart;
   x += instart;
   y += outstart;
   auto ystart = (float2 *)y;
@@ -368,30 +406,26 @@ __global__ void kernelc_mm8_one(
   // for (int i = 1; i < warpSize; i *= 2)
   //   xsum += __shfl_xor_sync(-1, xsum, i);
   // bfloat16 xsum = __shfl_sync(0xffffffff, sumate, 0);
-  
 
- __shared__ __nv_bfloat162 hotspace[32][32];
+  __shared__ __nv_bfloat162 hotspace[32][32];
 
   __nv_bfloat16 xsum = __float2bfloat16(0.0);
 
 #pragma unroll
   for (auto j = 0; j < (INSS); j += 1)
-    {
-      auto xinp = __float2bfloat16(x[j]);
-       xsum += xinp;
+  {
+    auto xinp = __float2bfloat16(x[j]);
+    xsum += xinp;
+  }
 
-    }
+  __nv_bfloat162 xsumx = __nv_bfloat162(xsum, xsum);
 
-__nv_bfloat162 xsumx = __nv_bfloat162(xsum,xsum);
-
-  
-size_t end = OUTPUTSIZE - outstart;
+  size_t end = OUTPUTSIZE - outstart;
 #pragma unroll
-  for (int i = 0; i < 32 && i < end; i+=1)
+  for (int i = 0; i < 32 && i < end; i += 1)
   {
 
-    __nv_bfloat162 xout = make_bfloat162(__float2bfloat16(0.0),__float2bfloat16(0.0));
-   
+    __nv_bfloat162 xout = make_bfloat162(__float2bfloat16(0.0), __float2bfloat16(0.0));
 
 #pragma unroll
     for (auto j = 0; j < (INSS); j += 1)
@@ -415,9 +449,7 @@ size_t end = OUTPUTSIZE - outstart;
       hotspace[i][warp] = xouts;
     }
 
-    
-
-    w += INPUTSIZE*2;
+    w += INPUTSIZE * 2;
     r += 1;
     o += 1;
   }
@@ -429,72 +461,69 @@ size_t end = OUTPUTSIZE - outstart;
   auto xouts = hotspace[warp][warppos];
   for (int i = 1; i < warpSize; i *= 2)
     xouts += __shfl_xor_sync(-1, xouts, i);
-    
-  if (warppos == 0 && warp < OUTPUTSIZE-outstart)
+
+  if (warppos == 0 && warp < OUTPUTSIZE - outstart)
   {
     auto outt = __bfloat1622float2(xouts);
     atomicAdd(&ystart[warp].x, outt.x);
     atomicAdd(&ystart[warp].y, outt.y);
-   
-    
   }
   // }
 }
 
-void matmul8_cuda_kernal(uint8_t *A, void *B, void *C, void *Ao, void *Ar, size_t BBT, size_t INSHAPE, size_t OUTSHAPE)
+void matmul8_cuda_kernal(uint8_t *A, void *B, void *C, void *Ao, void *Ar, size_t BBT, size_t INSHAPE, size_t OUTSHAPE, MMACTFUNC func)
 {
 
-  if (BBT != 1 || (OUTSHAPE%tsplit != 0))
+  if (1) //(BBT != 1 || (OUTSHAPE % tsplit != 0))
   {
-    runSgemmWarptiling8(BBT, OUTSHAPE, INSHAPE, (float *)B, (uint8_t *)A, (bfloat1624 *)Ar, (bfloat1624 *)Ao, (float *)C);
+    runSgemmWarptiling8(BBT, OUTSHAPE, INSHAPE, (float *)B, (uint8_t *)A, (double4 *)Ar, (double4 *)Ao, (float *)C, func);
   }
-  else
-  {
+  // else
+  // {
 
-    dim3 gridSize(OUTSHAPE / (tsplit), 1, 1);
-    // assert(tsplit%OUTSHAPE == 0);
-    
-    dim3 blockSize(jsplit, 1, 1);
+  //   dim3 gridSize(OUTSHAPE / (tsplit), 1, 1);
+  //   // assert(tsplit%OUTSHAPE == 0);
 
-    if (INSHAPE == 2048)
-    {
-      kernelc_mm8_one<2048 / jsplit><<<gridSize, blockSize>>>(
-          INSHAPE, OUTSHAPE, (float *)B, A, (__nv_bfloat162 *)Ar, (__nv_bfloat162 *)Ao, (float *)C);
-    }
-    else if (INSHAPE == 2560)
-    {
-      // kernelc_mm8_one<2560/jsplit><<<gridSize, blockSize>>>(
-      //     INSHAPE, OUTSHAPE, (float *)B, A, (__nv_bfloat162 *)Ar, (__nv_bfloat162 *)Ao, (float *)C);
-      runSgemmWarptiling8(BBT, OUTSHAPE, INSHAPE, (float *)B, (uint8_t *)A, (bfloat1624 *)Ar, (bfloat1624 *)Ao, (float *)C);
-    }
-    else if (INSHAPE == 8960)
-    {
-      // kernelc_mm8_one<8960/jsplit><<<gridSize, blockSize>>>(
-      //     INSHAPE, OUTSHAPE, (float *)B, A, (__nv_bfloat162 *)Ar, (__nv_bfloat162 *)Ao, (float *)C);
-      runSgemmWarptiling8(BBT, OUTSHAPE, INSHAPE, (float *)B, (uint8_t *)A, (bfloat1624 *)Ar, (bfloat1624 *)Ao, (float *)C);
-    }
-    else if (
-        INSHAPE == 7168)
-    {
-      runSgemmWarptiling8(BBT, OUTSHAPE, INSHAPE, (float *)B, (uint8_t *)A, (bfloat1624 *)Ar, (bfloat1624 *)Ao, (float *)C);
-    }
-    else if (
-        INSHAPE == 4096)
-    {
-      kernelc_mm8_one<4096 / jsplit><<<gridSize, blockSize>>>(
-          INSHAPE, OUTSHAPE, (float *)B, A, (__nv_bfloat162 *)Ar, (__nv_bfloat162 *)Ao, (float *)C);
-    }
-    else if (
-        INSHAPE == 14336)
-    {
-      kernelc_mm8_one<14336 / jsplit><<<gridSize, blockSize>>>(
-          INSHAPE, OUTSHAPE, (float *)B, A, (__nv_bfloat162 *)Ar, (__nv_bfloat162 *)Ao, (float *)C);
-    }
-    else
-    {
-      runSgemmWarptiling8(BBT, OUTSHAPE, INSHAPE, (float *)B, (uint8_t *)A, (bfloat1624 *)Ar, (bfloat1624 *)Ao, (float *)C);
-    }
-  }
+  //   dim3 blockSize(jsplit, 1, 1);
+
+  //   if (INSHAPE == 2048)
+  //   {
+  //     kernelc_mm8_one<2048 / jsplit><<<gridSize, blockSize>>>(
+  //         INSHAPE, OUTSHAPE, (float *)B, A, (__nv_bfloat162 *)Ar, (__nv_bfloat162 *)Ao, (float *)C);
+  //   }
+  //   else if (INSHAPE == 2560)
+  //   {
+  //     // kernelc_mm8_one<2560/jsplit><<<gridSize, blockSize>>>(
+  //     //     INSHAPE, OUTSHAPE, (float *)B, A, (__nv_bfloat162 *)Ar, (__nv_bfloat162 *)Ao, (float *)C);
+  //     runSgemmWarptiling8(BBT, OUTSHAPE, INSHAPE, (float *)B, (uint8_t *)A, (double4 *)Ar, (double4 *)Ao, (float *)C);
+  //   }
+  //   else if (INSHAPE == 8960)
+  //   {
+  //     // kernelc_mm8_one<8960/jsplit><<<gridSize, blockSize>>>(
+  //     //     INSHAPE, OUTSHAPE, (float *)B, A, (__nv_bfloat162 *)Ar, (__nv_bfloat162 *)Ao, (float *)C);
+  //     runSgemmWarptiling8(BBT, OUTSHAPE, INSHAPE, (float *)B, (uint8_t *)A, (double4 *)Ar, (double4 *)Ao, (float *)C);
+  //   }
+  //   else if (
+  //       INSHAPE == 7168)
+  //   {
+  //     runSgemmWarptiling8(BBT, OUTSHAPE, INSHAPE, (float *)B, (uint8_t *)A, (double4 *)Ar, (double4 *)Ao, (float *)C);
+  //   }
+  //   else if (
+  //       INSHAPE == 4096)
+  //   {
+  //     kernelc_mm8_one<4096 / jsplit><<<gridSize, blockSize>>>(
+  //         INSHAPE, OUTSHAPE, (float *)B, A, (__nv_bfloat162 *)Ar, (__nv_bfloat162 *)Ao, (float *)C);
+  //   }
+  //   else if (
+  //       INSHAPE == 14336)
+  //   {
+  //     kernelc_mm8_one<14336 / jsplit><<<gridSize, blockSize>>>(
+  //         INSHAPE, OUTSHAPE, (float *)B, A, (__nv_bfloat162 *)Ar, (__nv_bfloat162 *)Ao, (float *)C);
+  //   }
+  //   else
+  //   {
+  //     runSgemmWarptiling8(BBT, OUTSHAPE, INSHAPE, (float *)B, (uint8_t *)A, (double4 *)Ar, (double4 *)Ao, (float *)C);
+  //   }
+  // }
   // max size 1024
 }
-

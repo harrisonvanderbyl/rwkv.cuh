@@ -17,12 +17,16 @@ public:
     size_t bmm_size = 1;
     size_t outshape;
     size_t inshape;
+    MMACTFUNC activation = NONE;
     Linear()
     {
     }
 
-    Linear(safetensors &model, std::string prefix)
+    Linear(safetensors &model, std::string prefix, MMACTFUNC act = NONE)
     {
+
+        this->activation = act;
+
         if (model.contains(prefix + ".weight.zero"))
         {
             this->range = model[prefix + ".weight.range"];
@@ -67,7 +71,7 @@ public:
         this->bmm_size = other.bmm_size;
         this->outshape = other.outshape;
         this->inshape = other.inshape;
-        
+        this->activation = other.activation;
     }
 
     // default copy assignment operator
@@ -91,9 +95,9 @@ public:
         {
             for (size_t bb = 0; bb < bmm_size; bb += 1)
             {
-                for (size_t i = 0; i < input.shape[0]; i++)
+                for (size_t i = 0; i < buffer.shape[1]; i++)
                 {
-                    for (size_t j = 0; j < input.shape[1]; j++)
+                    for (size_t j = 0; j < buffer.shape[2]; j++)
                     {
                         buffer[bb][i][j].copyfrom(this->bias[bb]);
                     }
@@ -108,7 +112,7 @@ public:
 
         if (this->quantized)
         {
-            auto out = this->weight.matmul(this->range, this->offset, input, buffer);
+            auto out = this->weight.matmul(this->range, this->offset, input, buffer, activation);
             if(bmm_size > 1){
                 return out.cloneWithFalseReshape({bmm_size,input.shape[0], input.shape[1], outshape});    
             }
@@ -116,7 +120,7 @@ public:
         }
         else
         {
-            auto out = this->weight.matmul(input, buffer);
+            auto out = this->weight.matmul(input, buffer, activation);
             if(bmm_size > 1){
                 return out.cloneWithFalseReshape({bmm_size,input.shape[0], input.shape[1], outshape});    
             }
@@ -129,11 +133,11 @@ public:
 
         if (this->quantized)
         {
-            return this->weight.matmul(this->range, this->offset, input, residual);
+            return this->weight.matmul(this->range, this->offset, input, residual, activation);
         }
         else
         {
-            return this->weight.matmul(input, residual);
+            return this->weight.matmul(input, residual, activation);
         }
     }
 

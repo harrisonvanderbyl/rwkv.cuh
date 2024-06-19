@@ -72,7 +72,7 @@ float inline  simd_variance_acc(float *input, float mean)
 
 void inline simd_lerp(float *input, float *other, float *weighti, float *output)
 {
-    auto weight = _mm256_add_ps(_mm256_loadu_ps(weighti),_mm256_loadu_ps(output));
+    auto weight = _mm256_loadu_ps(weighti);
     _mm256_storeu_ps(output, _mm256_add_ps(_mm256_mul_ps(_mm256_loadu_ps(input), _mm256_sub_ps(_mm256_set1_ps(1.0f), weight)), _mm256_mul_ps(_mm256_loadu_ps(other), weight)));
 }
 
@@ -133,7 +133,7 @@ void inline  simd_wkv(size_t B, size_t T,size_t H,size_t Z, size_t bb,size_t tt,
             auto kv = _mm256_mul_ps(_mm256_loadu_ps(k+j) , _mm256_set1_ps(v[i]));
             auto sss = _mm256_loadu_ps(s+i*Z+j);
             acc = _mm256_fmadd_ps(_mm256_fmadd_ps(kv,_mm256_loadu_ps(u+j) , sss),_mm256_loadu_ps(r+j),acc);
-            _mm256_store_ps(s+i*Z+j, _mm256_fmadd_ps(sss, simdexp256(simdneg(simdexp256(_mm256_loadu_ps(w+j)))),kv));
+            _mm256_store_ps(s+i*Z+j, _mm256_fmadd_ps(sss, (_mm256_loadu_ps(w+j)),kv));
 
         }
 

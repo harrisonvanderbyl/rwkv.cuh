@@ -36,12 +36,6 @@
 #define WSUBM4 WM4 / WMITER // 8/2=4
 // const int WARPSIZE = 32; // warpSize is not constexpr
 
-struct bfloat1624
-{
-  __nv_bfloat162 x = __float2bfloat162_rn(0.0f);
-  __nv_bfloat162 y = __float2bfloat162_rn(0.0f);
-};
-
 // __fmaf_rn((a.x), (b.x), (c.x)), __fmaf_rn((a.y), (b.y), (c.y)), __fmaf_rn((a.z), (b.z), (c.z)), __fmaf_rn((a.w), (b.w), (c.w)) \
 
 #define bf16fma(a, b, c) asm("{fma.rn.bf16x2 %0,%1,%2,%3;\n}" : "=r"(*c) : "r"(__BFLOAT162_TO_CUI(a)), "r"(__BFLOAT162_TO_CUI(b)), "r"(*c));
@@ -55,9 +49,14 @@ struct bfloat1624
   bf16fma((a->x), (b), (c)); \
   bf16fma((a->y), (b), (c + 1));
 
-// host
 namespace wt
 {
+
+  __device__ void processFromSmem8(float *regM, float4 *regN, float4 *threadResults, const float *As,
+                                   const float4 *Bs, const uint warpRow, const uint warpCol,
+                                   const uint threadRowInWarp, const uint threadColInWarp, const uint M);
+  // host
+
   __device__ void loadFromGmem(int N, int K, const float *A, const float *maxA, const float *B, const float *OB,
                                float *As, float4 *Bs, int innerRowA, int innerColA,
                                int innerRowB, int innerColB, int bmmshape)
@@ -87,8 +86,8 @@ namespace wt
 
       auto bbs = Bs + (innerRowB + offset) * BN4 + innerColB;
 
-      bbs[0] = make_float4(OB[start],OB[start+K*1],OB[start+K*2],OB[start+K*3]);
-    
+      bbs[0] = make_float4(OB[start], OB[start + K * 1], OB[start + K * 2], OB[start + K * 3]);
+
       // asm("ld.global.v4.f32 {%0, %1, %2, %3}, [%4];"
       //     : "=f"(Bs[(innerRowB + offset) * BN + innerColB * 4 + 0]),
       //       "=f"(Bs[(innerRowB + offset) * BN + innerColB * 4 + 1]),
@@ -97,74 +96,7 @@ namespace wt
       //     : "l"(&B[(innerRowB + offset) * N + innerColB * 4]));
     }
   }
-
-  __device__ void
-  processFromSmem(float *regM, float4 *regN, float4 *threadResults, const float *As,
-                  const float4 *Bs, const uint warpRow, const uint warpCol,
-                  const uint threadRowInWarp, const uint threadColInWarp, const uint M)
-  {
-    // auto regMf4 = reinterpret_cast<float4 *>(regM);
-    // auto As4 = reinterpret_cast<const float4 *>(As);
-#pragma unroll
-    for (uint dotIdx = 0; dotIdx < BK; ++dotIdx)
-    {
-      // populate registers for whole warptile
-
-#pragma unroll
-      for (uint wSubRowIdx = 0; wSubRowIdx < WMITER; ++wSubRowIdx)
-      {
-#pragma unroll
-        for (uint i = 0; i < TM; ++i)
-        {
-          regM[wSubRowIdx * TM + i] =
-              As[(dotIdx * BM) + warpRow * WM + wSubRowIdx * WSUBM +
-                  threadRowInWarp * TM + i];
-        }
-      }
-#pragma unroll
-      for (uint wSubColIdx = 0; wSubColIdx < WNITER; ++wSubColIdx)
-      {
-#pragma unroll
-        for (uint i = 0; i < TN4; ++i)
-        {
-          regN[wSubColIdx * TN4 + i] = Bs[(dotIdx * BN4) + warpCol * WN4 + wSubColIdx * WSUBN4 + threadColInWarp * TN4 + i];
-        }
-      }
-
-// execute warptile matmul
-#pragma unroll
-      for (uint wSubRowIdx = 0; wSubRowIdx < WMITER; ++wSubRowIdx)
-      {
-#pragma unroll
-        for (uint wSubColIdx = 0; wSubColIdx < WNITER; ++wSubColIdx)
-        {
-// calculate per-thread results
-#pragma unroll
-          for (uint resIdxM = 0; resIdxM < TM; ++resIdxM)
-          {
-#pragma unroll
-            for (uint resIdxN = 0; resIdxN < TN4; ++resIdxN)
-            {
-              auto iiv = threadResults + (wSubRowIdx * TM + resIdxM) * (WNITER * TN4) +
-                         (wSubColIdx * TN4) + resIdxN;
-
-              auto rn = regN + wSubColIdx * TN4 + resIdxN;
-              auto rnn = regM[wSubRowIdx * TM + resIdxM];
-
-              // UFMAFF(rn, , ((unsigned int *)iiv));
-              iiv->x += rn->x * rnn;
-              iiv->y += rn->y * rnn;
-              iiv->z += rn->z * rnn;
-              iiv->w += rn->w * rnn;
-            }
-          }
-        }
-      }
-    }
-  }
-
-} // namespace wt
-
+}
 /*
  * @tparam BM The threadblock size for M dimension SMEM caching.
  * @tparam BN The threadblock size for N dimension SMEM caching.
@@ -178,7 +110,7 @@ namespace wt
  */
 __global__ void __launch_bounds__(NUM_THREADS)
     sgemmWarptiling(int M, int N, int K, float *A, float *B,
-                    float *C, int bmmshape)
+                    float *C, int bmmshape, MMACTFUNC func)
 {
   const uint cRow = blockIdx.y;
   const uint cCol = blockIdx.x;
@@ -222,8 +154,9 @@ __global__ void __launch_bounds__(NUM_THREADS)
   auto AO = A;
   for (uint BMMINDEX = 0; BMMINDEX < bmmshape; BMMINDEX += 1)
   {
-    for(uint yy = 0; yy < WMITER * TM * WNITER * TN4; yy++){
-      threadResults4[yy] = make_float4(0,0,0,0);
+    for (uint yy = 0; yy < WMITER * TM * WNITER * TN4; yy++)
+    {
+      threadResults4[yy] = make_float4(0, 0, 0, 0);
     }
     // we cache into registers on the warptile level
     float regM[WMITER * TM] = {0.0};
@@ -236,8 +169,8 @@ __global__ void __launch_bounds__(NUM_THREADS)
       wt::loadFromGmem(
           N, K, A, maxA, B, OB + N * K * BMMINDEX, As, Bs, innerRowA, innerColA, innerRowB, innerColB, bmmshape);
       __syncthreads();
-      wt::processFromSmem(regM, regN, threadResults4, As, Bs, warpRow, warpCol,
-                          threadRowInWarp, threadColInWarp, M);
+      wt::processFromSmem8(regM, regN, threadResults4, As, Bs, warpRow, warpCol,
+                           threadRowInWarp, threadColInWarp, M);
       A += BK;     // move BK columns to right
       B += BK * N; // move BK rows down
 
@@ -259,22 +192,58 @@ __global__ void __launch_bounds__(NUM_THREADS)
         {
 
 #pragma unroll
-          for (uint resIdxN = 0; resIdxN < TN4; resIdxN += 1)
+          for (uint resIdxN = 0; resIdxN < TN; resIdxN += 1)
           {
 
-            auto iix = C + BMMINDEX * M * N + (cRow * BM + warpRow * WM + threadRowInWarp * TM + wSubRowIdx * WSUBM + resIdxM) * N + cCol * BN + warpCol * WN + wSubColIdx * WSUBN + threadColInWarp * TN + resIdxN * 4;
+            auto iix = C + BMMINDEX * M * N + (cRow * BM + warpRow * WM + threadRowInWarp * TM + wSubRowIdx * WSUBM + resIdxM) * N + cCol * BN + warpCol * WN + wSubColIdx * WSUBN + threadColInWarp * TN + resIdxN;
 
             if (iix < maxc)
             {
-              auto iiy = (float4 *)(((float *)threadResults4) + (wSubRowIdx * TM + resIdxM) * (WNITER * TN) + wSubColIdx * TN + resIdxN * 4);
+              auto zz1 = *(((float *)threadResults4) + (wSubRowIdx * TM + resIdxM) * (WNITER * TN) + wSubColIdx * TN + resIdxN);
 
-              auto iixh = reinterpret_cast<float4 *>(iix);
-              
+              auto spot = (iix);
 
-              iixh->x += iiy->x;
-              iixh->y += iiy->y;
-              iixh->z += iiy->z;
-              iixh->w += iiy->w;
+              // iixh->x += iiy->x;
+              // iixh->y += iiy->y;
+              // iixh->z += iiy->z;
+              // iixh->w += iiy->w;
+
+              if (func == TANH)
+              {
+                spot[0] = tanh(spot[0] + zz1);
+              }
+              if (func == RELUSQUARE)
+              {
+                spot[0] += zz1;
+                if (spot[0] > 0)
+                {
+                  spot[0] = spot[0] * spot[0];
+                }
+                else
+                {
+                  spot[0] = 0;
+                }
+              }
+              if (func == SWISHMUL)
+              {
+                spot[0] = (spot[0] * zz1) / (1.0 + exp(-zz1));
+              }
+              if (func == SIGMOIDMUL)
+              {
+                spot[0] = (*(iix - C + AO - N * M)) / (1.0 + exp(-zz1)) + spot[0];
+              }
+              if (func == NONE)
+              {
+                spot[0] += zz1;
+              }
+              if (func == EXPNEGEXP)
+              {
+                spot[0] = exp(-exp(zz1 + spot[0]));
+              }
+              if (func == SETVALUE)
+              {
+                spot[0] = zz1;
+              }
             }
           }
         }
@@ -283,7 +252,7 @@ __global__ void __launch_bounds__(NUM_THREADS)
   }
 }
 
-void runSgemmWarptiling(int M, int N, int K, float *A, float *B, float *C, int bmmshape)
+void runSgemmWarptiling(int M, int N, int K, float *A, float *B, float *C, int bmmshape, MMACTFUNC func)
 {
   // Settings for A100
 
@@ -320,7 +289,7 @@ void runSgemmWarptiling(int M, int N, int K, float *A, float *B, float *C, int b
                 "BN*BK must be a multiple of 4*256 to vectorize loads");
 
   dim3 gridDim(CEIL_DIV(N, BN), CEIL_DIV(M, BM));
-  sgemmWarptiling<<<gridDim, blockDim>>>(M, N, K, A, B, C, bmmshape);
+  sgemmWarptiling<<<gridDim, blockDim>>>(M, N, K, A, B, C, bmmshape, func);
 
   cudaDeviceSynchronize();
   // get error
@@ -332,13 +301,14 @@ void runSgemmWarptiling(int M, int N, int K, float *A, float *B, float *C, int b
   }
 }
 
-void matmul_cuda_kernal(void *A, void *B, void *C, size_t BBT, size_t INSHAPE, size_t OUTSHAPE, TENSORTYPE dtype, size_t bmmshape)
+void matmul_cuda_kernal(void *A, void *B, void *C, size_t BBT, size_t INSHAPE, size_t OUTSHAPE, TENSORTYPE dtype, size_t bmmshape, MMACTFUNC func)
 {
 
- 
-   
-     runSgemmWarptiling(BBT, OUTSHAPE, INSHAPE, (float *)B, (float *)A, (float *)C, bmmshape);
-    
-  
+  if(OUTSHAPE == 0 || INSHAPE == 0){
+    return;
+  }
+
+  runSgemmWarptiling(BBT, OUTSHAPE, INSHAPE, (float *)B, (float *)A, (float *)C, bmmshape, func);
+
   // max size 1024
 }
