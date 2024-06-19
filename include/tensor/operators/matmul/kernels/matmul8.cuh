@@ -52,7 +52,7 @@
 // host
 namespace wt
 {
-  __device__ void loadFromGmem8(int N, int K, const float *A, const float *maxA, const uint8_t *B, const uint8_t *OB, double4 *range, double4 *off,
+  __device__ void loadFromGmem8(int N, int K, const float *A, const float *maxA, const uint8_t *B, const uint8_t *OB, bfloat1624 *range, bfloat1624 *off,
                                 float *As, float4 *Bs, int innerRowA, int innerColA,
                                 int innerRowB, int innerColB)
   {
@@ -81,15 +81,12 @@ namespace wt
 
       auto bbs = Bs + (innerRowB + offset) * BN4 + innerColB;
 
-      auto bbsx = make_float4(OB[start], OB[start + K * 1], OB[start + K * 2], OB[start + K * 3]);
-      bbsx.x = bbsx.x * range[innerColB].x + off[innerColB].x;
-      bbsx.y = bbsx.y * range[innerColB].y + off[innerColB].y;
-      bbsx.z = bbsx.z * range[innerColB].z + off[innerColB].z;
-      bbsx.w = bbsx.w * range[innerColB].w + off[innerColB].w;
-      bbs[0].x = bbsx.x;
-      bbs[0].y = bbsx.y;
-      bbs[0].z = bbsx.z;
-      bbs[0].w = bbsx.w;
+      auto bbsx = bfloat1624(OB[start], OB[start + K * 1], OB[start + K * 2], OB[start + K * 3]);
+      bbsx.fma(range[innerColB], off[innerColB]);
+      bbs[0].x = bbsx.x.x;
+      bbs[0].y = bbsx.x.y;
+      bbs[0].z = bbsx.y.x;
+      bbs[0].w = bbsx.y.y;
 
       // asm("ld.global.v4.f32 {%0, %1, %2, %3}, [%4];"
       //     : "=f"(Bs[(innerRowB + offset) * BN + innerColB * 4 + 0]),
@@ -179,7 +176,7 @@ namespace wt
  * @tparam TN The per-thread tile size for N dimension.
  */
 __global__ void __launch_bounds__(NUM_THREADS)
-    sgemmWarptiling8(int M, int N, int K, float *A, uint8_t *B, double4 *range, double4 *off,
+    sgemmWarptiling8(int M, int N, int K, float *A, uint8_t *B, bfloat1624 *range, bfloat1624 *off,
                      float *C, MMACTFUNC func)
 {
   const uint cRow = blockIdx.y;
@@ -321,7 +318,7 @@ __global__ void __launch_bounds__(NUM_THREADS)
   }
 }
 
-void runSgemmWarptiling8(int M, int N, int K, float *A, uint8_t *B, double4 *range, double4 *off, float *C, MMACTFUNC func)
+void runSgemmWarptiling8(int M, int N, int K, float *A, uint8_t *B, bfloat1624 *range, bfloat1624 *off, float *C, MMACTFUNC func)
 {
   // Settings for A100
 
@@ -379,8 +376,8 @@ __global__ void kernelc_mm8_one(
     const unsigned long long OUTPUTSIZE,
     float *x,
     uint8_t *w,
-    double2 *r,
-    double2 *o,
+    __nv_bfloat162 *r,
+    __nv_bfloat162 *o,
     float *y, MMACTFUNC func)
 {
 
@@ -439,7 +436,7 @@ __global__ void kernelc_mm8_one(
       // xsum += xinp;
     }
 
-    auto xouts = xout * make_bfloat162(r->x,r->y) + make_bfloat162(o->x,o->y) * xsumx;
+    auto xouts = xout * (*r) + (*o) * xsumx;
 
     for (int ij = 1; ij < warpSize; ij *= 2)
       xouts += __shfl_xor_sync(-1, xouts, ij);
@@ -528,9 +525,9 @@ __global__ void kernelc_mm8_one(
 void matmul8_cuda_kernal(uint8_t *A, void *B, void *C, void *Ao, void *Ar, size_t BBT, size_t INSHAPE, size_t OUTSHAPE, MMACTFUNC func)
 {
 
-  if (BBT != 1 || (OUTSHAPE % tsplit != 0))
+  if (true || BBT != 1 || (OUTSHAPE % tsplit != 0))
   {
-    runSgemmWarptiling8(BBT, OUTSHAPE, INSHAPE, (float *)B, (uint8_t *)A, (double4 *)Ar, (double4 *)Ao, (float *)C, func);
+    runSgemmWarptiling8(BBT, OUTSHAPE, INSHAPE, (float *)B, (uint8_t *)A, (bfloat1624 *)Ar, (bfloat1624 *)Ao, (float *)C, func);
   }
   else
   {
@@ -543,42 +540,42 @@ void matmul8_cuda_kernal(uint8_t *A, void *B, void *C, void *Ao, void *Ar, size_
     if (INSHAPE == 2048)
     {
       kernelc_mm8_one<2048 / jsplit><<<gridSize, blockSize>>>(
-          INSHAPE, OUTSHAPE, (float *)B, A, (double2 *)Ar, (double2 *)Ao, (float *)C, func);
+          INSHAPE, OUTSHAPE, (float *)B, A, (nv_bfloat162 *)Ar, (nv_bfloat162 *)Ao, (float *)C, func);
     }
     else if (INSHAPE == 2560)
     {
-      kernelc_mm8_one<2560/jsplit><<<gridSize, blockSize>>>(
-          INSHAPE, OUTSHAPE, (float *)B, A, (double2 *)Ar, (double2 *)Ao, (float *)C,func);
-      // runSgemmWarptiling8(BBT, OUTSHAPE, INSHAPE, (float *)B, (uint8_t *)A, (double4 *)Ar, (double4 *)Ao, (float *)C);
+      // kernelc_mm8_one<2560/jsplit + 1><<<gridSize, blockSize>>>(
+      //     INSHAPE, OUTSHAPE, (float *)B, A, (nv_bfloat162 *)Ar, (nv_bfloat162 *)Ao, (float *)C,func);
+      runSgemmWarptiling8(BBT, OUTSHAPE, INSHAPE, (float *)B, (uint8_t *)A, (bfloat1624 *)Ar, (bfloat1624 *)Ao, (float *)C, func);
     }
     else if (INSHAPE == 8960)
     {
       kernelc_mm8_one<8960/jsplit><<<gridSize, blockSize>>>(
-          INSHAPE, OUTSHAPE, (float *)B, A, (double2 *)Ar, (double2 *)Ao, (float *)C, func);
-      // runSgemmWarptiling8(BBT, OUTSHAPE, INSHAPE, (float *)B, (uint8_t *)A, (double4 *)Ar, (double4 *)Ao, (float *)C, func);
+          INSHAPE, OUTSHAPE, (float *)B, A, (nv_bfloat162 *)Ar, (nv_bfloat162 *)Ao, (float *)C, func);
+      // runSgemmWarptiling8(BBT, OUTSHAPE, INSHAPE, (float *)B, (uint8_t *)A, (bfloat1624 *)Ar, (bfloat1624 *)Ao, (float *)C, func);
     }
     else if (
         INSHAPE == 7168)
     {
-      // runSgemmWarptiling8(BBT, OUTSHAPE, INSHAPE, (float *)B, (uint8_t *)A, (double4 *)Ar, (double4 *)Ao, (float *)C, func);
+      // runSgemmWarptiling8(BBT, OUTSHAPE, INSHAPE, (float *)B, (uint8_t *)A, (bfloat1624 *)Ar, (bfloat1624 *)Ao, (float *)C, func);
       kernelc_mm8_one<7168 / jsplit><<<gridSize, blockSize>>>(
-          INSHAPE, OUTSHAPE, (float *)B, A, (double2 *)Ar, (double2 *)Ao, (float *)C,func);
+          INSHAPE, OUTSHAPE, (float *)B, A, (nv_bfloat162 *)Ar, (nv_bfloat162 *)Ao, (float *)C,func);
     }
     else if (
         INSHAPE == 4096)
     {
       kernelc_mm8_one<4096 / jsplit><<<gridSize, blockSize>>>(
-          INSHAPE, OUTSHAPE, (float *)B, A, (double2 *)Ar, (double2 *)Ao, (float *)C,func);
+          INSHAPE, OUTSHAPE, (float *)B, A, (nv_bfloat162 *)Ar, (nv_bfloat162 *)Ao, (float *)C,func);
     }
     else if (
         INSHAPE == 14336)
     {
       kernelc_mm8_one<14336 / jsplit><<<gridSize, blockSize>>>(
-          INSHAPE, OUTSHAPE, (float *)B, A, (double2 *)Ar, (double2 *)Ao, (float *)C,func);
+          INSHAPE, OUTSHAPE, (float *)B, A, (nv_bfloat162 *)Ar, (nv_bfloat162 *)Ao, (float *)C,func);
     }
     else
     {
-      runSgemmWarptiling8(BBT, OUTSHAPE, INSHAPE, (float *)B, (uint8_t *)A, (double4 *)Ar, (double4 *)Ao, (float *)C, func);
+      runSgemmWarptiling8(BBT, OUTSHAPE, INSHAPE, (float *)B, (uint8_t *)A, (bfloat1624 *)Ar, (bfloat1624 *)Ao, (float *)C, func);
     }
   }
   // max size 1024

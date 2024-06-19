@@ -16,10 +16,22 @@
 const static int WARPSIZE = 32; // warpSize is not constexpr
 // #define BLOCKSPLIT 8
 
-struct bfloat1624
+__device__ struct bfloat1624
 {
   __nv_bfloat162 x = __float2bfloat162_rn(0.0f);
   __nv_bfloat162 y = __float2bfloat162_rn(0.0f);
+  __device__ bfloat1624(float4 in){
+    x = __float22bfloat162_rn(*(float2*)&in.x);
+    y = __float22bfloat162_rn(*(float2*)&in.z);
+  };
+  __device__ bfloat1624(float a, float b, float c, float d){
+    x = __floats2bfloat162_rn(a,b);
+    y = __floats2bfloat162_rn(c,d);
+  }
+  __device__ void fma(bfloat1624 r, bfloat1624 o){
+    x = __hfma2(x,r.x,o.x);
+    y = __hfma2(y,r.y,o.y);
+  }
 };
 
 

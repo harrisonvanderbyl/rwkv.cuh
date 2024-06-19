@@ -33,7 +33,7 @@ void matmul8_cpu_kernal(uint8_t *A, void *B, void *C, void *Ao, void *Ar, size_t
 
                         double zz1 = dot_uint8_floats(A + b*INSHAPE, BAINSHAPE, INSHAPE);
                         
-                        zz1 = ss2f * (((double*)(Ao))[b]) + zz1 * (((double*)(Ar))[b]);
+                        zz1 = ss2f * (((float*)(Ao))[b]) + zz1 * (((float*)(Ar))[b]);
                         if(func == TANH){
                             auto ax = exp(spot[b]+ zz1);
                             auto bx = exp(-(spot[b]+zz1));
