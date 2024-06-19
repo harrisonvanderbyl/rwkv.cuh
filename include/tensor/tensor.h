@@ -635,15 +635,11 @@ struct Tensor
         return count;
     }
 
-    Tensor relusquared();
-    Tensor sigmoidmul(Tensor &other, Tensor &residual, Tensor &output);
     Tensor shift(Tensor input, Tensor output, Tensor &state, size_t indims, bool initiate_move = false);
-    Tensor swishmul(Tensor &other);
     Tensor matmul(Tensor &other, Tensor residual = Tensor(), MMACTFUNC act = NONE);
-    Tensor matmul(Tensor &Art, Tensor &Aot, Tensor &Bt, Tensor residual = Tensor(), MMACTFUNC = NONE);
+    Tensor matmul(Tensor &Art, Tensor &Aot, Tensor &Bt, Tensor residual = Tensor(), MMACTFUNC act = NONE);
     Tensor normalize(const Tensor &weight, const Tensor &bias, const Tensor &result, size_t heads = 1, float epsilon = 1e-5);
 
-    Tensor tanh();
     Tensor wkv5(Tensor &r, Tensor &k, Tensor &v, Tensor &w, Tensor &u, Tensor &y);
 
     Tensor operator[](size_t index);

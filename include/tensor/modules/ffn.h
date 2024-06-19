@@ -27,22 +27,10 @@ class FeedForward
 
             auto pool = get_threadpool();
 
-            check_for_errors();
-            
-            pool->debug(input[0], "ffn input k");
-            pool->debug(input[1], "ffn input r");
-
             auto k = key(input[0]);
-            pool->debug(k, "ffn k");
             pool->sync();
             auto v = value(k, input[0]); 
-             pool->debug(v, "ffn v");
-
-
             auto r = receptance(input[1],residual);
-            pool->debug(r, "ffn r");
-
-            
         }
 
 };

@@ -10,33 +10,12 @@ static size_t get_simd_width()
     return 1;
 }
 
-
-float __attribute__((weak))simdexpfallback(float xx)
-{
-    return expf(-xx);
-}
-
-
-void __attribute__((weak)) simd_sigmoidmul(float *input, float *other, float *residual, float *output)
-{
-    (*output = ((*(other)/ ((1.0f) + simdexpfallback((*(input))))) + *(residual)));
-}
-
 float __attribute__((weak)) reduce_float(float xx)
 {
     auto x = flp(&xx);
     return x[0];
 }
 
-void __attribute__((weak)) simd_swishmul(float *input, float *other, float *output)
-{
-    (*output = ((*(float *)other * *(float *)input) / ((1.0f) + exp(*(float *)input))));
-}
-
-void __attribute__((weak)) simd_relusquare(float *input, float *output)
-{
-    (*output = (*(input) * fmaxf(*(input), 0.0f)));
-}
 
 float __attribute__((weak)) simd_accumulate(float *input)
 {
@@ -61,12 +40,6 @@ void __attribute__((weak)) simd_norm_assign(float *input, float mean, float vare
     (*output = ((((*(input)- (mean))/ (vareps)) * *(weight)) + *(bias)));
 }
 
-void __attribute__((weak)) simd_tanh(float* input){
-    auto x = *(input);
-    auto ax = exp(x);
-    auto bx = exp(-(x));
-    (*input = ((ax-bx)/(ax+bx)));
-}
 
 float __attribute__((weak)) dot_uint8_floats(uint8_t *input, float *other, size_t size)
 {
@@ -110,7 +83,7 @@ void __attribute__((weak)) simd_wkv(size_t B, size_t T,size_t H,size_t Z, size_t
             auto kv = *(k+j) * v[i];
             auto sss = *(s+i*Z+j);
             acc = ((kv * *(u+j) + sss)**(r+j)+acc);
-            (*(s+i*Z+j) =  (sss*simdexpfallback(exp(*(w+j)))+kv));
+            (*(s+i*Z+j) =  (sss**(w+j)+kv));
 
         }
 

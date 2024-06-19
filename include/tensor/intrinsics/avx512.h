@@ -14,45 +14,11 @@ size_t get_simd_width()
     return 16;
 }
 
-#if !defined(__INTEL_LLVM_COMPILER)
-
-__m512 simdexp512(__m512 xx)
-{
-    auto x = flp(&xx);
-    return _mm512_set_ps(expf(x[15]), expf(x[14]), expf(x[13]), expf(x[12]), expf(x[11]), expf(x[10]), expf(x[9]), expf(x[8]), expf(x[7]), expf(x[6]), expf(x[5]), expf(x[4]), expf(x[3]), expf(x[2]), expf(x[1]), expf(x[0]));
-}
-
-#else
-
-__m512 simdexp512(__m512 xx)
-{
-    return _mm512_exp_ps(-xx);
-}
-#endif
-
-__m512 simdneg(__m512 xx){
-    return _mm512_mul_ps(xx,_mm512_set1_ps(-1));
-}
-
-void inline simd_sigmoidmul(float *input, float *other, float *residual, float *output)
-{
-    _mm512_storeu_ps(output, _mm512_add_ps(_mm512_div_ps(_mm512_loadu_ps(other), _mm512_add_ps(_mm512_set1_ps(1.0f), simdexp512(simdneg((_mm512_loadu_ps(input)))))), _mm512_loadu_ps(residual)));
-}
 
 float inline reduce_float(__m512 xx)
 {
     auto x = flp(&xx);
     return _mm512_reduce_add_ps(xx);
-}
-
-void inline simd_swishmul(float *input, float *other, float *output)
-{
-    _mm512_storeu_ps(output, _mm512_div_ps(_mm512_mul_ps(*(__m512 *)other, *(__m512 *)input), _mm512_add_ps(_mm512_set1_ps(1.0f), simdexp512(simdneg(*(__m512 *)input)))));
-}
-
-void inline simd_relusquare(float *input, float *output)
-{
-    _mm512_storeu_ps(output, _mm512_mul_ps(_mm512_loadu_ps(input), _mm512_max_ps(_mm512_loadu_ps(input), _mm512_setzero_ps())));
 }
 
 float inline simd_accumulate(float *input)
@@ -74,12 +40,6 @@ void inline simd_lerp(float *input, float *other, float *weighti, float *output)
     _mm512_storeu_ps(output, _mm512_add_ps(_mm512_mul_ps(_mm512_loadu_ps(input), _mm512_sub_ps(_mm512_set1_ps(1.0f), weight)), _mm512_mul_ps(_mm512_loadu_ps(other), weight)));
 }
 
-void simd_tanh(float* input){
-    auto x = _mm512_loadu_ps(input);
-    auto ax = simdexp512(x);
-    auto bx = simdexp512(simdneg(x));
-    _mm512_storeu_ps(input, _mm512_div_ps(_mm512_sub_ps(ax,bx),_mm512_add_ps(ax,bx)));
-}
 
 void inline simd_norm_assign(float *input, float mean, float vareps, float *weight, float *bias, float *output)
 {

@@ -65,49 +65,24 @@ public:
 
         auto cbuf = buffer.cloneWithFalseReshape({input.shape[1], input.shape[2], input.shape[3]});
 
-        pool->debug(input[0], "time_decay_att_in");
+        
         auto ww = this->w1(input[0]);
 
-        pool->debug(input[0], "time_decay_att_pw1");
-        // auto www = ww.tanh();
         pool->sync();
 
         auto w = this->w2(ww);
-
-        pool->debug(w, "time_decay");
-
-        pool->sync();
-        pool->debug(input[1], "mix k");
-        pool->debug(input[3], "mix r");
-        pool->debug(input[2], "mix v");
-
         auto k = this->key(input[1]);
         auto r = this->receptance(input[3]);
         auto v = this->value(input[2]);
 
-        pool->debug(k, "start k");
-        pool->debug(v, "start v");
-        pool->debug(r, "start r");
-
-        check_for_errors();
         auto xm = this->state.wkv5(r, k, v, w, this->time_faaaa, cbuf);
-        pool->debug(xm, "start xm");
-
-        check_for_errors();
-
+        
         auto xxa = this->ln_x(xm);
-        pool->debug(xxa, "start xxa");
-
-        check_for_errors();
-        pool->sync();
         auto gv = this->gate(input[4], xxa);
-        pool->debug(gv, "start gv");
-
+        
         pool->sync();
         auto out = this->output(gv, residual);
-        pool->debug(out, "start out");
-
-        check_for_errors();
+        
 
         return out;
     }

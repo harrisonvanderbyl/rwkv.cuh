@@ -19,44 +19,6 @@ size_t get_simd_width()
     return 4;
 }
 
-float32x4_t arm_exp(float32x4_t x)
-{
-    float32x4_t xx = vdupq_n_f32(0);
-    xx[0] = exp(x[0]);
-    xx[1] = exp(x[1]);
-    xx[2] = exp(x[2]);
-    xx[3] = exp(x[3]);
-    return xx;
-}
-
-    void simd_sigmoidmul(float *input, float *other, float *residual, float *output)
-{
-    // arm neon
-    float32x4_t v1 = vld1q_f32(input);
-    float32x4_t v2 = vld1q_f32(other);
-    float32x4_t v3 = vaddq_f32(vdupq_n_f32(1.0f), arm_exp(vnegq_f32(v1)));
-    // return v2 / v3;
-    vst1q_f32(output, vaddq_f32(vdivq_f32(v2, v3), vld1q_f32(residual)));
-}
-
-void simd_swishmul(float *input, float *other, float *output)
-{
-    // arm neon
-    float32x4_t v1 = vld1q_f32(input);
-    float32x4_t v2 = vld1q_f32(other);
-    float32x4_t v3 = vaddq_f32(vdupq_n_f32(1.0f), arm_exp(vnegq_f32(v1)));
-
-    // return v2 * v1 / v3;
-    vst1q_f32(output, vmulq_f32(v2, vdivq_f32(v1, v3)));
-}
-
-void simd_relusquare(float *input, float *output)
-{
-    // arm neon
-    float32x4_t v1 = vld1q_f32(input);
-    float32x4_t v2 = vmaxq_f32(v1, vdupq_n_f32(0.0f));
-    vst1q_f32(output, vmulq_f32(v1, v2));
-}
 
 float simd_accumulate(float *input)
 {
@@ -98,13 +60,6 @@ void simd_norm_assign(float *input, float mean, float vareps, float *weight, flo
     float32x4_t v4 = vmulq_f32(v3, vld1q_f32(weight));
     float32x4_t v5 = vaddq_f32(v4, vld1q_f32(bias));
     vst1q_f32(output, v5);
-}
-
-void simd_tanh(float* input){
-    auto x = vld1q_f32(input);
-    auto ax = arm_exp(x);
-    auto bx = arm_exp(vnegq_f32(x));
-    vst1q(input, vdivq_f32(vsubq_f32(ax,bx),vaddq_f32(ax,bx)));
 }
 
 
