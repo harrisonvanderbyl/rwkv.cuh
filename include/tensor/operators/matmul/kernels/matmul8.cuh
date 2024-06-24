@@ -367,216 +367,157 @@ void runSgemmWarptiling8(int M, int N, int K, float *A, uint8_t *B, bfloat1624 *
   }
 }
 
-#define jsplit 1024
-#define tsplit 64
+#define THREADCC 1024
+#define warps 32
+#define tpw 32
+#define procs 32
 
 template <int INSS>
 __global__ void kernelc_mm8_one(
     const unsigned long long INPUTSIZE,
     const unsigned long long OUTPUTSIZE,
-    float *x,
+    __nv_bfloat162 *x,
     uint8_t *w,
-    __nv_bfloat162 *r,
-    __nv_bfloat162 *o,
+    __nv_bfloat16 *r,
+    __nv_bfloat16 *o,
     float *y, MMACTFUNC func)
 {
 
-  const unsigned long long outstart = blockIdx.x * (tsplit);
+  auto threadid = threadIdx.x;
+  auto warpid = threadid / warps;
+  auto warppos = threadid % warps;
 
-  const unsigned long long instart = threadIdx.x * INSS;
+  auto outputstart = blockIdx.x * INSS;
   auto XO = x;
-  r += blockIdx.x * 32;
-  o += blockIdx.x * 32;
-  w += outstart * INPUTSIZE + instart;
-  x += instart;
   auto oy = y;
-  y += outstart;
-  auto ystart = (float2 *)y;
-  auto warppos = threadIdx.x % warpSize;
-  auto warp = threadIdx.x / warpSize;
-  // y_local[threadIdx.x] += x[token * INPUTSIZE + (start + threadIdx.y)] * mval;
+  y += outputstart;
+  w += INPUTSIZE * outputstart;
+  r += outputstart;
+  o += outputstart;
 
-  // bfloat16 __shared__ xinp[jsplit];
-
-  // bfloat16 xsum = ((bfloat16 *)(x + threadIdx.x))[1];
-  // xinp[threadIdx.x] = xsum;
-
-  // for (int i = 1; i < warpSize; i *= 2)
-  //   xsum += __shfl_xor_sync(-1, xsum, i);
-  // bfloat16 xsum = __shfl_sync(0xffffffff, sumate, 0);
-
-  __shared__ __nv_bfloat162 hotspace[32][32];
-
-  __nv_bfloat16 xsum = __float2bfloat16(0.0);
-
-#pragma unroll
-  for (auto j = 0; j < (INSS); j += 1)
-  {
-    auto xinp = __float2bfloat16(x[j]);
-    xsum += xinp;
-  }
-
-  __nv_bfloat162 xsumx = __nv_bfloat162(xsum, xsum);
-
-  size_t end = OUTPUTSIZE - outstart;
-#pragma unroll
-  for (int i = 0; i < 32 && i < end; i += 1)
-  {
-
-    __nv_bfloat162 xout = make_bfloat162(__float2bfloat16(0.0), __float2bfloat16(0.0));
-
-#pragma unroll
-    for (auto j = 0; j < (INSS); j += 1)
+  for (size_t instart = 0; instart < INPUTSIZE; instart += 1024)
     {
-      // asm("{fma.rn.bf16x2 %0,%1,%2,%3;\n}" : "=r"(*out) : "r"(__BFLOAT162_TO_CUI(a)), "r"(__BFLOAT162_TO_CUI(b)), "r"(__BFLOAT162_TO_CUI(c)));
-      auto nb = __float22bfloat162_rn(make_float2(w[j], w[j + INPUTSIZE]));
-      auto xinp = __float2bfloat162_rn(x[j]);
-      asm("{fma.rn.bf16x2 %0,%1,%2,%3;\n}"
-          : "=r"(__BFLOAT162_TO_CUI(xout)) : "r"(__BFLOAT162_TO_CUI(xinp)), "r"(__BFLOAT162_TO_CUI(nb)), "r"(__BFLOAT162_TO_CUI(xout)));
-      // xsum += xinp;
+      if (threadid + instart < INPUTSIZE)
+      {
+        x[(threadid + instart)].x = x[(threadid + instart)].y;
+      }
     }
+    __syncthreads();
 
-    auto xouts = xout * (*r) + (*o) * xsumx;
+  // atomicAdd(&ystart[warp].x, outt.x);
+  // __shared__ __nv_bfloat162 pool[32];
+  // atomicAdd(&ystart[warp].y, outt.y);
+  #pragma unroll
+  for (size_t start = 0; start < INSS; start+=32)
+  {
+    __nv_bfloat162 acc = __float2bfloat162_rn(0.0);
+    __nv_bfloat162 offset = __bfloat162bfloat162((*(o+warpid)));
+
+    for (size_t instart = 0; instart < INPUTSIZE; instart += 32)
+    {
+        offset.x = w[warppos + instart + warpid*INPUTSIZE];
+        acc = __hfma2(x[(warppos + instart)] , offset,acc);
+    }
 
     for (int ij = 1; ij < warpSize; ij *= 2)
-      xouts += __shfl_xor_sync(-1, xouts, ij);
+      acc += __shfl_xor_sync(-1, acc, ij);
+    
+    // pool[warpid] = acc;
 
+    // __syncthreads();
+
+    // acc = pool[warppos];
+
+    // for (int ij = 1; ij < warpSize; ij *= 2)
+    //   acc += __shfl_xor_sync(-1, acc, ij);
     if (warppos == 0)
     {
-      // atomicAdd(ystart + i * 2 + 1, xouts);
-      hotspace[i][warp] = xouts;
-    }
+    float zz1 = __bfloat162float(acc.x**(r+warpid) + acc.y);
 
-    w += INPUTSIZE * 2;
-    r += 1;
-    o += 1;
+    auto spot = y + warpid;
+    
+
+      if (func == TANH)
+      {
+        spot[0] = tanh(spot[0] + zz1);
+      }
+      if (func == RELUSQUARE)
+      {
+        spot[0] += zz1;
+        if (spot[0] > 0)
+        {
+          spot[0] = spot[0] * spot[0];
+        }
+        else
+        {
+          spot[0] = 0;
+        }
+      }
+      if (func == SWISHMUL)
+      {
+        spot[0] = (spot[0] * zz1) / (1.0 + exp(-zz1));
+      }
+      if (func == SIGMOIDMUL)
+      {
+        spot[0] = (*((spot - oy) + ((float *)XO) + (-OUTPUTSIZE))) / (1.0 + exp(-zz1)) + spot[0];
+      }
+      if (func == NONE)
+      {
+        spot[0] += zz1;
+      }
+      if (func == EXPNEGEXP)
+      {
+        spot[0] = exp(-exp(zz1 + spot[0]));
+      }
+      if (func == SETVALUE)
+      {
+        spot[0] = zz1;
+      }
+    }
+    w += INPUTSIZE*32;
+    r += 32;
+    o += 32;
+    y += 32;
   }
 
-  __syncthreads();
-
-  // if (warp  < tsplit/2)
-  // {
-  auto xouts = hotspace[warp][warppos];
-  for (int i = 1; i < warpSize; i *= 2)
-    xouts += __shfl_xor_sync(-1, xouts, i);
-
-  if (warppos == 0 && warp < OUTPUTSIZE - outstart)
-  {
-    auto zz1s = __bfloat1622float2(xouts);
-    auto zz1 = &zz1s.x;
-    // atomicAdd(&ystart[warp].x, outt.x);
-    // atomicAdd(&ystart[warp].y, outt.y);
-    auto spot = &ystart[warp].x;
-    if (func == TANH)
-    {
-      spot[0] = tanh(spot[0] + zz1[0]);
-      spot[1] = tanh(spot[1] + zz1[1]);
-    }
-    if (func == RELUSQUARE)
-    {
-      spot[0] += zz1[0];
-      if (spot[0] > 0)
-      {
-        spot[0] = spot[0] * spot[0];
-      }
-      else
-      {
-        spot[0] = 0;
-      }
-      spot[1] += zz1[1];
-      if (spot[1] > 0)
-      {
-        spot[1] = spot[1] * spot[1];
-      }
-      else
-      {
-        spot[1] = 0;
-      }
-    }
-    if (func == SWISHMUL)
-    {
-      spot[0] = (spot[0] * zz1[0]) / (1.0 + exp(-zz1[0]));
-      spot[1] = (spot[1] * zz1[1]) / (1.0 + exp(-zz1[1]));
-    }
-    if (func == SIGMOIDMUL)
-    {
-      spot[0] = (*((spot - oy) + XO + (-OUTPUTSIZE))) / (1.0 + exp(-zz1[0])) + spot[0];
-      spot[1] = (*((spot - oy + 1) + XO + (-OUTPUTSIZE))) / (1.0 + exp(-zz1[1])) + spot[1];
-    }
-    if (func == NONE)
-    {
-      spot[0] += zz1[0];
-      spot[1] += zz1[1];
-    }
-    if (func == EXPNEGEXP)
-    {
-      spot[0] = exp(-exp(zz1[0] + spot[0]));
-      spot[1] = exp(-exp(zz1[1] + spot[1]));
-    }
-    if (func == SETVALUE)
-    {
-      spot[0] = zz1[0];
-      spot[1] = zz1[1];
-    }
-  }
   // }
 }
 
+#define KERNEL(O)                                                                                              \
+  else if (OUTSHAPE == O)                                                                                      \
+  {                                                                                                            \
+    kernelc_mm8_one<O / procs><<<gridSize, blockSize>>>(                                                       \
+        INSHAPE, OUTSHAPE, (__nv_bfloat162 *)B, A, (__nv_bfloat16 *)Ar, (__nv_bfloat16 *)Ao, (float *)C, func); \
+  }
+
 void matmul8_cuda_kernal(uint8_t *A, void *B, void *C, void *Ao, void *Ar, size_t BBT, size_t INSHAPE, size_t OUTSHAPE, MMACTFUNC func)
 {
-
-  if (true || BBT != 1 || (OUTSHAPE % tsplit != 0))
+  dim3 gridSize(procs, 1, 1);
+  // assert(tsplit%OUTSHAPE == 0);
+  dim3 blockSize(1024, 1, 1);
+  if (BBT != 1)
   {
     runSgemmWarptiling8(BBT, OUTSHAPE, INSHAPE, (float *)B, (uint8_t *)A, (bfloat1624 *)Ar, (bfloat1624 *)Ao, (float *)C, func);
   }
+  KERNEL(65536)
+  KERNEL(32768)
+  KERNEL(16384)
+  KERNEL(8192)
+  KERNEL(7168)
+  KERNEL(4096)
+  KERNEL(2048)
+  KERNEL(1024)
+  // KERNEL(512)
+  // KERNEL(256)
+  // KERNEL(128)
+  // KERNEL(64)
+  // KERNEL(32)
   else
   {
-
-    dim3 gridSize(OUTSHAPE / (tsplit), 1, 1);
-    // assert(tsplit%OUTSHAPE == 0);
-
-    dim3 blockSize(jsplit, 1, 1);
-
-    if (INSHAPE == 2048)
-    {
-      kernelc_mm8_one<2048 / jsplit><<<gridSize, blockSize>>>(
-          INSHAPE, OUTSHAPE, (float *)B, A, (nv_bfloat162 *)Ar, (nv_bfloat162 *)Ao, (float *)C, func);
-    }
-    else if (INSHAPE == 2560)
-    {
-      // kernelc_mm8_one<2560/jsplit + 1><<<gridSize, blockSize>>>(
-      //     INSHAPE, OUTSHAPE, (float *)B, A, (nv_bfloat162 *)Ar, (nv_bfloat162 *)Ao, (float *)C,func);
-      runSgemmWarptiling8(BBT, OUTSHAPE, INSHAPE, (float *)B, (uint8_t *)A, (bfloat1624 *)Ar, (bfloat1624 *)Ao, (float *)C, func);
-    }
-    else if (INSHAPE == 8960)
-    {
-      kernelc_mm8_one<8960/jsplit><<<gridSize, blockSize>>>(
-          INSHAPE, OUTSHAPE, (float *)B, A, (nv_bfloat162 *)Ar, (nv_bfloat162 *)Ao, (float *)C, func);
-      // runSgemmWarptiling8(BBT, OUTSHAPE, INSHAPE, (float *)B, (uint8_t *)A, (bfloat1624 *)Ar, (bfloat1624 *)Ao, (float *)C, func);
-    }
-    else if (
-        INSHAPE == 7168)
-    {
-      // runSgemmWarptiling8(BBT, OUTSHAPE, INSHAPE, (float *)B, (uint8_t *)A, (bfloat1624 *)Ar, (bfloat1624 *)Ao, (float *)C, func);
-      kernelc_mm8_one<7168 / jsplit><<<gridSize, blockSize>>>(
-          INSHAPE, OUTSHAPE, (float *)B, A, (nv_bfloat162 *)Ar, (nv_bfloat162 *)Ao, (float *)C,func);
-    }
-    else if (
-        INSHAPE == 4096)
-    {
-      kernelc_mm8_one<4096 / jsplit><<<gridSize, blockSize>>>(
-          INSHAPE, OUTSHAPE, (float *)B, A, (nv_bfloat162 *)Ar, (nv_bfloat162 *)Ao, (float *)C,func);
-    }
-    else if (
-        INSHAPE == 14336)
-    {
-      kernelc_mm8_one<14336 / jsplit><<<gridSize, blockSize>>>(
-          INSHAPE, OUTSHAPE, (float *)B, A, (nv_bfloat162 *)Ar, (nv_bfloat162 *)Ao, (float *)C,func);
-    }
-    else
-    {
-      runSgemmWarptiling8(BBT, OUTSHAPE, INSHAPE, (float *)B, (uint8_t *)A, (bfloat1624 *)Ar, (bfloat1624 *)Ao, (float *)C, func);
-    }
+    runSgemmWarptiling8(BBT, OUTSHAPE, INSHAPE, (float *)B, (uint8_t *)A, (bfloat1624 *)Ar, (bfloat1624 *)Ao, (float *)C, func);
   }
+
+  check_for_errors();
+
   // max size 1024
 }
