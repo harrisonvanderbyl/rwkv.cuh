@@ -19,7 +19,7 @@ __global__ void layernorm(float* input, float* output, float* weight, float* bia
 
     float sum = 0.0f;
     float sumsq = 0.0f;
-    for (size_t i = thread; i < headshape; i+=CUNORMTHREADS){
+    for (size_t i = thread%32; i < headshape; i+=32){
         sum += input[i];
         sumsq += input[i] * input[i];
     }
@@ -30,13 +30,14 @@ __global__ void layernorm(float* input, float* output, float* weight, float* bia
         sumsq += __shfl_xor_sync(0xffffffff, sumsq, i);
     }
     
+    
    
     float mean = sum / headshape;
     float var = sumsq / headshape - mean * mean;
 
     float invstd = 1.0f / sqrt(var + eps);
 
-    for (size_t i = thread; i < headshape; i+=CUNORMTHREADS){
+    for (size_t i = thread; i < headshape; i+=blockDim.x){
         output[i] = (input[i] - mean) * invstd * weight[i] + bias[i];
     }
 }
@@ -50,7 +51,7 @@ void normalize_cuda_kernel(void* input, void* weight, void* bias, void* output, 
         // batchsize
         size_t blocks = size/headshape;
         auto gridsize = dim3(blocks,1,1);
-        auto headsperblock = dim3(CUNORMTHREADS,1,1);
+        auto headsperblock = dim3(std::min(headshape,(size_t)1024),1,1);
 
        
         if (dtype == TENSORTYPE::kFLOAT_32)
