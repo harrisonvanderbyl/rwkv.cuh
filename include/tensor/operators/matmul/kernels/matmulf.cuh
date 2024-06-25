@@ -238,7 +238,7 @@ __global__ void __launch_bounds__(NUM_THREADS)
               }
               if (func == EXPNEGEXP)
               {
-                spot[0] = exp(-exp(zz1 + spot[0]));
+                spot[0] = exp(-exp(double(zz1 + spot[0])));
               }
               if (func == SETVALUE)
               {

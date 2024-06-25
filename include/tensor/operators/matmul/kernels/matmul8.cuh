@@ -476,7 +476,7 @@ __global__ void kernelc_mm8_one(
       }
       if (func == EXPNEGEXP)
       {
-        spot[0] = exp(-exp(zz1 + spot[0]));
+        spot[0] = exp(-exp(double(zz1 + spot[0])));
       }
       if (func == SETVALUE)
       {
