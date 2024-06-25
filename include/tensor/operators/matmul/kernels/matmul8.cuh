@@ -370,7 +370,7 @@ void runSgemmWarptiling8(int M, int N, int K, float *A, uint8_t *B, bfloat1624 *
 #define THREADCC 1024
 #define warps 32
 #define tpw 32
-#define procs 32
+#define procs 128
 
 template <int INSS>
 __global__ void kernelc_mm8_one(
@@ -395,14 +395,14 @@ __global__ void kernelc_mm8_one(
   r += outputstart;
   o += outputstart;
 
-  for (size_t instart = 0; instart < INPUTSIZE; instart += 1024)
-    {
-      if (threadid + instart < INPUTSIZE)
-      {
-        x[(threadid + instart)].x = x[(threadid + instart)].y;
-      }
-    }
-    __syncthreads();
+  // for (size_t instart = 0; instart < INPUTSIZE; instart += 1024)
+  //   {
+  //     if (threadid + instart < INPUTSIZE)
+  //     {
+  //       x[(threadid + instart)].x = x[(threadid + instart)].y;
+  //     }
+  //   }
+  //   __syncthreads();
 
   // atomicAdd(&ystart[warp].x, outt.x);
   // __shared__ __nv_bfloat162 pool[32];
@@ -410,13 +410,22 @@ __global__ void kernelc_mm8_one(
   #pragma unroll
   for (size_t start = 0; start < INSS; start+=32)
   {
+    
     __nv_bfloat162 acc = __float2bfloat162_rn(0.0);
-    __nv_bfloat162 offset = __bfloat162bfloat162((*(o+warpid)));
-
-    for (size_t instart = 0; instart < INPUTSIZE; instart += 32)
-    {
-        offset.x = w[warppos + instart + warpid*INPUTSIZE];
-        acc = __hfma2(x[(warppos + instart)] , offset,acc);
+    __nv_bfloat162 offset = acc;
+    __nv_bfloat162 buff = acc;
+    __nv_bfloat16 off = (*(o+warpid)) / (*(r+warpid));
+    if(start + warpid < INSS){
+     
+      for (size_t instart = 0; instart < INPUTSIZE; instart += 64)
+      {
+          offset.x = __uint2bfloat16_rd(w[warppos*2 + instart + warpid*INPUTSIZE]) + off;
+          offset.y = __uint2bfloat16_rd(w[warppos*2+1 + instart + warpid*INPUTSIZE]) + off;
+          buff.x = x[(warppos*2 + instart)].y;
+          buff.y = x[(warppos*2+1 + instart)].y;
+          acc = __hfma2(buff , offset,acc);
+      } 
+    
     }
 
     for (int ij = 1; ij < warpSize; ij *= 2)
@@ -430,9 +439,9 @@ __global__ void kernelc_mm8_one(
 
     // for (int ij = 1; ij < warpSize; ij *= 2)
     //   acc += __shfl_xor_sync(-1, acc, ij);
-    if (warppos == 0)
+    if (warppos == 0 && start + warpid < INSS)
     {
-    float zz1 = __bfloat162float(acc.x**(r+warpid) + acc.y);
+    float zz1 = __bfloat162float(acc.x**(r+warpid) + acc.y**(r+warpid));
 
     auto spot = y + warpid;
     
@@ -486,7 +495,7 @@ __global__ void kernelc_mm8_one(
 #define KERNEL(O)                                                                                              \
   else if (OUTSHAPE == O)                                                                                      \
   {                                                                                                            \
-    kernelc_mm8_one<O / procs><<<gridSize, blockSize>>>(                                                       \
+    kernelc_mm8_one<O / procs><<<gridSize, std::min((O/procs)*32,1024)>>>(                                                       \
         INSHAPE, OUTSHAPE, (__nv_bfloat162 *)B, A, (__nv_bfloat16 *)Ar, (__nv_bfloat16 *)Ao, (float *)C, func); \
   }
 
