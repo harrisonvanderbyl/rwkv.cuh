@@ -57,7 +57,8 @@ namespace wt
                                    const uint threadRowInWarp, const uint threadColInWarp, const uint M);
   // host
 
-  __device__ void loadFromGmem(int N, int K, const float *A, const float *maxA, const float *B, const float *OB,
+  template <typename T>
+  __device__ void loadFromGmem(int N, int K, const float *A, const float *maxA, const T *B, const T *OB,
                                float *As, float4 *Bs, int innerRowA, int innerColA,
                                int innerRowB, int innerColB, int bmmshape)
   {
@@ -108,15 +109,16 @@ namespace wt
  * @tparam TM The per-thread tile size for M dimension.
  * @tparam TN The per-thread tile size for N dimension.
  */
+template <typename T>
 __global__ void __launch_bounds__(NUM_THREADS)
-    sgemmWarptiling(int M, int N, int K, float *A, float *B,
+    sgemmWarptiling(int M, int N, int K, float *A, T *B,
                     float *C, int bmmshape, MMACTFUNC func)
 {
   const uint cRow = blockIdx.y;
   const uint cCol = blockIdx.x;
   const float *maxc = C + M * N * bmmshape;
   const float *maxA = A + M * K * bmmshape;
-  const float *OB = B;
+  const T *OB = B;
 
   // Placement of the warp in the threadblock tile
   const uint warpIdx = threadIdx.x / WARPSIZE; // the warp this thread is in
@@ -252,7 +254,8 @@ __global__ void __launch_bounds__(NUM_THREADS)
   }
 }
 
-void runSgemmWarptiling(int M, int N, int K, float *A, float *B, float *C, int bmmshape, MMACTFUNC func)
+template <typename T>
+void runSgemmWarptiling(int M, int N, int K, float *A, T *B, float *C, int bmmshape, MMACTFUNC func)
 {
   // Settings for A100
 
@@ -301,14 +304,170 @@ void runSgemmWarptiling(int M, int N, int K, float *A, float *B, float *C, int b
   }
 }
 
+#define THREADCC 1024
+#define warps 32
+#define tpw 32
+#define procs 128
+
+template <int INSS>
+__global__ void kernelc_mmbf16_one(
+    const unsigned long long INPUTSIZE,
+    const unsigned long long OUTPUTSIZE,
+    __nv_bfloat162 *x,
+    __nv_bfloat16 *w,
+    float *y, MMACTFUNC func)
+{
+
+  auto threadid = threadIdx.x;
+  auto warpid = threadid / warps;
+  auto warppos = threadid % warps;
+
+  auto outputstart = blockIdx.x * INSS;
+  auto XO = x;
+  auto oy = y;
+  y += outputstart;
+  w += INPUTSIZE * outputstart;
+
+// for (size_t instart = 0; instart < INPUTSIZE; instart += 1024)
+//   {
+//     if (threadid + instart < INPUTSIZE)
+//     {
+//       x[(threadid + instart)].x = x[(threadid + instart)].y;
+//     }
+//   }
+//   __syncthreads();
+
+// atomicAdd(&ystart[warp].x, outt.x);
+// __shared__ __nv_bfloat162 pool[32];
+// atomicAdd(&ystart[warp].y, outt.y);
+#pragma unroll
+  for (size_t start = 0; start < INSS; start += 32)
+  {
+
+    float2 acc2 = make_float2(0.f,0.f);
+    __nv_bfloat162 buff;
+    if (start + warpid < INSS)
+    {
+
+      for (size_t instart = 0; instart < INPUTSIZE; instart += 64)
+      {
+        buff.x = x[(warppos * 2 + instart)].y;
+        buff.y = x[(warppos * 2 + 1 + instart)].y;
+        auto mxx = __bfloat1622float2(buff * *(__nv_bfloat162*)(w + warppos * 2 + instart + warpid * INPUTSIZE));
+        acc2.x += mxx.x;
+        acc2.y += mxx.y; 
+      }
+    }
+
+    auto acc= acc2.x + acc2.y;
+    for (int ij = 1; ij < warpSize; ij *= 2)
+      acc += __shfl_xor_sync(-1, acc, ij);
+
+    // pool[warpid] = acc;
+
+    // __syncthreads();
+
+    // acc = pool[warppos];
+
+    // for (int ij = 1; ij < warpSize; ij *= 2)
+    //   acc += __shfl_xor_sync(-1, acc, ij);
+    if (warppos == 0 && start + warpid < INSS)
+    {
+      float zz1 = acc;
+
+      auto spot = y + warpid;
+
+      if (func == TANH)
+      {
+        spot[0] = tanh(spot[0] + zz1);
+      }
+      if (func == RELUSQUARE)
+      {
+        spot[0] += zz1;
+        if (spot[0] > 0)
+        {
+          spot[0] = spot[0] * spot[0];
+        }
+        else
+        {
+          spot[0] = 0;
+        }
+      }
+      if (func == SWISHMUL)
+      {
+        spot[0] = (spot[0] * zz1) / (1.0 + exp(-zz1));
+      }
+      if (func == SIGMOIDMUL)
+      {
+        spot[0] = (*((spot - oy) + ((float *)XO) + (-OUTPUTSIZE))) / (1.0 + exp(-zz1)) + spot[0];
+      }
+      if (func == NONE)
+      {
+        spot[0] += zz1;
+      }
+      if (func == EXPNEGEXP)
+      {
+        spot[0] = exp(-exp(double(zz1 + spot[0])));
+      }
+      if (func == SETVALUE)
+      {
+        spot[0] = zz1;
+      }
+    }
+    w += INPUTSIZE * 32;
+    y += 32;
+  }
+
+  // }
+}
+
+#define KERNELBF(O)                                                                    \
+  else if (OUTSHAPE == O)                                                              \
+  {                                                                                    \
+    kernelc_mmbf16_one<O / procs><<<gridSize, std::min((O / procs) * 32, 1024)>>>(     \
+        INSHAPE, OUTSHAPE, (__nv_bfloat162 *)B, (__nv_bfloat16 *)A, (float *)C, func); \
+  }
+
 void matmul_cuda_kernal(void *A, void *B, void *C, size_t BBT, size_t INSHAPE, size_t OUTSHAPE, TENSORTYPE dtype, size_t bmmshape, MMACTFUNC func)
 {
 
-  if(OUTSHAPE == 0 || INSHAPE == 0){
+  dim3 gridSize(procs, 1, 1);
+  // assert(tsplit%OUTSHAPE == 0);
+  dim3 blockSize(1024, 1, 1);
+
+  if (OUTSHAPE == 0 || INSHAPE == 0)
+  {
     return;
   }
 
-  runSgemmWarptiling(BBT, OUTSHAPE, INSHAPE, (float *)B, (float *)A, (float *)C, bmmshape, func);
+  if (dtype == kBFLOAT_16)
+  {
+    if (BBT != 1)
+    {
+      runSgemmWarptiling(BBT, OUTSHAPE, INSHAPE, (float *)B, (__nv_bfloat16 *)A, (float *)C, bmmshape, func);
+    }
+    KERNELBF(65536)
+    KERNELBF(32768)
+    KERNELBF(16384)
+    KERNELBF(8192)
+    KERNELBF(7168)
+    KERNELBF(4096)
+    KERNELBF(2048)
+    KERNELBF(1024)
+    // KERNEL(512)
+    // KERNEL(256)
+    // KERNEL(128)
+    // KERNEL(64)
+    // KERNEL(32)
+    else
+    {
+      runSgemmWarptiling(BBT, OUTSHAPE, INSHAPE, (float *)B, (__nv_bfloat16 *)A, (float *)C, bmmshape, func);
+    }
+  }
+  else
+  {
+    runSgemmWarptiling(BBT, OUTSHAPE, INSHAPE, (float *)B, (float *)A, (float *)C, bmmshape, func);
+  }
 
   // max size 1024
 }

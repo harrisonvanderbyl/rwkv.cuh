@@ -95,13 +95,13 @@ inline Tensor Tensor::matmul(Tensor &Bt, Tensor Ct, MMACTFUNC func)
     
 
     if(Bt.device==DEVICE::CPU){
-        matmul_cpu_kernal((void *)A, (void *)B, (void *)C, BB * T, INSHAPE, OUTSHAPE, Bt.dtype, bmmsize, func);
+        matmul_cpu_kernal((void *)A, (void *)B, (void *)C, BB * T, INSHAPE, OUTSHAPE, this->dtype, bmmsize, func);
     } 
     else
     {
     
         
-        matmul_cuda_kernal((void *)A, (void *)B, (void *)C, BB * T, INSHAPE, OUTSHAPE, Bt.dtype, bmmsize, func);
+        matmul_cuda_kernal((void *)A, (void *)B, (void *)C, BB * T, INSHAPE, OUTSHAPE, this->dtype, bmmsize, func);
         
     }
 
