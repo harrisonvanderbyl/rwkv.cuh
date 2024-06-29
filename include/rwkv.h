@@ -65,11 +65,29 @@ public:
 
     }
 
-    Tensor operator()(std::vector<std::vector<size_t>> input)
+    Tensor operator()(std::vector<std::vector<size_t>> input, Tensor images = Tensor())
     {
 
         auto pool = get_threadpool(); 
+        if(images.data!=nullptr){
+            std::vector<size_t> newtoks = {};
+            for(size_t i = 0; i < 577; i++){
+                newtoks.push_back(0);
+            }
+            for(auto r : input[0]){
+                newtoks.push_back(r);
+            }
+            input[0] = newtoks; 
+        }
         auto rx = emb1(input);
+
+
+        if(images.data!=nullptr){
+            for(size_t i = 0; i < 577; i++){
+                rx[0][i].copyfrom(images[0][i]);
+            }
+        }
+
         auto x = ln0(rx);
         pool->debug(x,"ln0");
 

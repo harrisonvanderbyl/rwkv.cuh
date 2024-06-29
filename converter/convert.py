@@ -20,16 +20,25 @@ questions = [
     ,
     inquirer.List('mode',
                 message="What do you want to do?",
-                choices=['Convert to FP32', 'Convert to Uint8'],
+                choices=['Convert to FP32', 'Convert to Uint8', "Convert to BF16"],
             ),
 ]
 resp = inquirer.prompt(questions)
 path = resp["file"]
 model = torch.load(path, "cpu")
+
+isimagemodel = False
+if("rwkv" in list(model.keys())[0]):
+    isimagemodel = True
+    keys = list(model.keys())
+    for i in keys:
+        model[i.replace("rwkv.","")] = model.pop(i)
+    
+
 mode = resp["mode"]
 fp32 = mode == "Convert to FP32"
 uint8 = mode == "Convert to Uint8"
-
+bf16 = mode == "Convert to BF16"
 
 # float32= Tensor(-0.477592, -9.87757, -10.544, -9.66997, , ..., -23.7958, -23.7907, -23.739, -23.7474, shape=(1, 18, 65536))
 def get_model_layout(torch_weights):
@@ -53,8 +62,19 @@ import tqdm as tqdm
 keys = [*model.keys()]
 print(keys)
 for key in tqdm.tqdm(keys):
-    if model[key].shape.__len__() == 2 and key != "emb.weight" and "time_" not in key and "weight" in key:
-        
+    if("vit.vision_model.embeddings.patch_embedding.weight" in key):
+        wt = model.pop(key)
+        model[key] = wt.reshape(wt.shape[0],-1)
+        model["vit.vision_model.embeddings.position_embedding.weight"][0] += model.pop("vit.vision_model.embeddings.class_embedding")
+
+    if "q_proj"in key:
+        model[key] *= 0.125
+    # if("proj" in key and "weight" in key):
+    #     if("weight" in key):
+    #         model[key] = model[key].t().contiguous()
+
+    if model[key].shape.__len__() == 2 and key != "emb.weight" and key != "vit.vision_model.embeddings.position_embedding.weight" and "time_" not in key and "weight" in key and "proj" not in key:
+       
         # bf16 conversion for avx512
         
         if uint8:
@@ -75,7 +95,11 @@ for key in tqdm.tqdm(keys):
             
             # model[key] = model.pop(key).t().contiguous().cpu()
         else:
-            model[key] = model.pop(key).float().clone().cpu()
+            if bf16:
+                model[key] = model.pop(key).bfloat16().clone().cpu()
+            else:
+                model[key] = model.pop(key).float().clone().cpu()
+        
                 
     elif model[key].shape.__len__() == 1:
         model[key] = model.pop(key).float().cpu()
@@ -93,22 +117,24 @@ zm1w = torch.zeros(1,n_embd)
 zm2w = torch.zeros(n_embd,1)
 zm4 = torch.zeros(5,n_embd,0)
 zm3 = torch.zeros(2,n_embd,0)
+dtype = torch.bfloat16 if bf16 else torch.float32
 for i in range(n_layer):
 
     model[f"blocks.{i}.ffnshift.time_mix_x"] = torch.zeros(1,n_embd)
     model[f"blocks.{i}.ffnshift.time_mix_w1.weight"] = zm1
     model[f"blocks.{i}.ffnshift.time_mix_w2.weight"] = zm3
     maamix = "maa" if is_v6 else "mix"
+
     model[f"blocks.{i}.ffnshift.time_mix_w2.bias"] = torch.stack([model.pop(f"blocks.{i}.ffn.time_{maamix}_{j}") for j in "kr"]).reshape(2,-1)
     model[f"blocks.{i}.att.w2.bias"] = model.pop(f"blocks.{i}.att.time_decay").reshape(n_embd).float().cpu()
     if(not is_v6):
         model[f"blocks.{i}.att.w2.bias"] = model[f"blocks.{i}.att.w2.bias"].double().exp().neg().exp().float()
 
-    model[f"blocks.{i}.att.w1.weight"] = model.pop(f"blocks.{i}.att.time_decay_w1").t().contiguous() if is_v6 else zm1
-    model[f"blocks.{i}.att.w2.weight"] = model.pop(f"blocks.{i}.att.time_decay_w2").t().contiguous() if is_v6 else zm2
+    model[f"blocks.{i}.att.w1.weight"] = model.pop(f"blocks.{i}.att.time_decay_w1").t().contiguous().to(dtype) if is_v6 else zm1
+    model[f"blocks.{i}.att.w2.weight"] = model.pop(f"blocks.{i}.att.time_decay_w2").t().contiguous().to(dtype) if is_v6 else zm2
     model[f"blocks.{i}.attshift.time_mix_x"] = model.pop(f"blocks.{i}.att.time_maa_x").reshape(1,-1) if is_v6 else torch.zeros(1,n_embd)
-    model[f"blocks.{i}.attshift.time_mix_w1.weight"] = model.pop(f"blocks.{i}.att.time_maa_w1").transpose(0,1).contiguous() if is_v6 else zm1
-    model[f"blocks.{i}.attshift.time_mix_w2.weight"] = model.pop(f"blocks.{i}.att.time_maa_w2").transpose(1,2).contiguous() if is_v6 else zm4
+    model[f"blocks.{i}.attshift.time_mix_w1.weight"] = model.pop(f"blocks.{i}.att.time_maa_w1").transpose(0,1).contiguous().to(dtype) if is_v6 else zm1
+    model[f"blocks.{i}.attshift.time_mix_w2.weight"] = model.pop(f"blocks.{i}.att.time_maa_w2").transpose(1,2).contiguous().to(dtype) if is_v6 else zm4
     model[f"blocks.{i}.attshift.time_mix_w2.bias"] = torch.stack(([model.pop(f"blocks.{i}.att.time_{maamix}_{j}") for j in ("wkvrg" if is_v6 else "kvrg") ]*2)[-5:]).reshape(5,-1)
     
 

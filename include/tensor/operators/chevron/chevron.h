@@ -32,6 +32,22 @@ static std::ostream& operator<<(std::ostream& os, const Tensor& t) {
 
         os << "]\n";
     }
+    if (t.dtype == TENSORTYPE::kFLOAT_64){
+        os << "\n";
+        os << "[";
+        os << t.get<double>(0) << ", ";
+        if(t.get_element_count() > 1)
+            os << t.get<double>(1) << ", ";
+        if(t.get_element_count() > 2)
+            os << "...";
+        if(t.get_element_count() > 3){
+            os << ", " << t.get<double>(t.get_element_count() - 2);
+            os << ", " << t.get<double>(t.get_element_count() - 1);
+        }
+        
+
+        os << "]\n";
+    }
     if (t.dtype == TENSORTYPE::kBFLOAT_16){
         os << "\n";
         os << "[";

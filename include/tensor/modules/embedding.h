@@ -8,7 +8,7 @@ class Embedding
         Tensor buffer;
         Embedding(){
         }
-        Embedding(Tensor& weighta){
+        Embedding(Tensor weighta){
             this->weight = weighta;
         }
         Tensor operator()(std::vector<std::vector<size_t>> indices){
@@ -21,6 +21,14 @@ class Embedding
                 return weight[indices[0][0]].cloneWithFalseReshape({1, 1, weight.shape[1]});
             }
             return weight.gather(indices, cbuf);
+        }
+        Tensor operator()(){
+
+            if (buffer.data == nullptr || buffer.shape[0] * buffer.shape[1] < weight.shape[0] * weight.shape[1] || buffer.dtype != weight.dtype ){
+                buffer = Tensor({1, weight.shape[0] , weight.shape[1]}, weight.dtype, buffer.device);
+            }
+            buffer.copyfrom(weight);
+            return buffer;
         }
 
         void cuda(){

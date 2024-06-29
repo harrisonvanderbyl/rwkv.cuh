@@ -70,6 +70,27 @@ float inline  dot_floats(float *input, float *other, size_t size)
     return reduce_float(zz1);
 }
 
+float inline  dot_bfloats(bfloat16 *input, float *other, size_t size)
+{
+    auto zz1 = _mm256_setzero_ps();
+    auto k = 0;
+    for (; k+get_simd_width() <= size; k += get_simd_width())
+    {
+        auto kksu = _mm_loadu_si128((const __m128i *)(input + k));
+        auto kksi = _mm256_cvtepi16_epi32(kksu);
+        auto kks = (__m256)_mm256_slli_epi32(kksi,16);
+        zz1 = _mm256_fmadd_ps(kks, _mm256_loadu_ps(other + k), zz1);
+    }
+
+    for(
+        ; k < size; k++
+    ){
+        zz1[k%8] += float(input[k]) * other[k];
+    }
+
+    return reduce_float(zz1);
+}
+
 
 
 void inline  simd_wkv(size_t B, size_t T,size_t H,size_t Z, size_t bb,size_t tt, size_t hh, float *vv, float *ss, float *kk, float *uu, float *ww, float *rr, float *yy)

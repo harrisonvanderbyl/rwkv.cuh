@@ -124,7 +124,7 @@ public:
                                      {
                                         if (i == 0 && block){
 
-            std::cout << "Hard sync, please only use in testing!" << std::endl;
+            // std::cout << "Hard sync, please only use in testing!" << std::endl;
                                      }
                                     
                                          
@@ -229,5 +229,52 @@ public:
 };
 
 ThreadPool *get_threadpool(size_t threadsNum = 0, bool debug = false);
+
+
+void Tensor::operator+=(Tensor other)
+{
+        assert(device==CPU);
+        assert(dtype==kFLOAT_32);
+
+        auto threadpool = get_threadpool();
+        threadpool->sync();
+        auto headsize = get_element_count()/threadpool->heads;
+        auto othersize = get_element_count();
+        float* current = (float*) data;
+        float* others = (float*) other.data;
+
+        for(size_t h = 0; h < threadpool->heads; h++){
+            threadpool->add_job([h,headsize,othersize, current, others](){
+                for(size_t offset = h*headsize; offset < (h+1)*headsize; offset++){
+                    current[offset] += others[offset%othersize];
+                }
+            }, h);
+        }
+        threadpool->sync();
+
+    }
+
+    void Tensor::operator*=(Tensor other)
+{
+        assert(device==CPU);
+        assert(dtype==kFLOAT_32);
+
+        auto threadpool = get_threadpool();
+        threadpool->sync();
+        auto headsize = get_element_count()/threadpool->heads;
+        auto othersize = get_element_count();
+        float* current = (float*) data;
+        float* others = (float*) other.data;
+
+        for(size_t h = 0; h < threadpool->heads; h++){
+            threadpool->add_job([h,headsize,othersize, current, others](){
+                for(size_t offset = h*headsize; offset < (h+1)*headsize; offset++){
+                    current[offset] *= others[offset%othersize];
+                }
+            }, h);
+        }
+        threadpool->sync();
+
+    }
 
 #endif // TENSOR_OPERATORS_THREADING_THREADING_H_

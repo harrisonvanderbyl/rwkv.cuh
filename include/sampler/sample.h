@@ -15,7 +15,7 @@ void softmax(float* logits)
     }
     for (size_t i = 0; i < ALEN; i++)
     {
-        logits[i] = exp(logits[i] - log(sum));
+        logits[i] = exp(logits[i])/sum;
     }
 };
 

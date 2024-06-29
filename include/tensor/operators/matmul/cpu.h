@@ -78,7 +78,7 @@ void matmul_cpu_kernal(void *A, void *B, void *C, size_t BBT, size_t INSHAPE, si
     for (size_t head = 0; head < headsnum; head++)
     {
         pool->add_job(
-            [A, B, C, BBT, INSHAPE, OUTSHAPE, headsize, head, bmmshape, func]()
+            [A, B, C, BBT, INSHAPE, OUTSHAPE, headsize, head, bmmshape, func, dtype]()
             {
                 for (size_t bbt = 0; bbt < BBT; bbt += 1)
                 {
@@ -88,7 +88,13 @@ void matmul_cpu_kernal(void *A, void *B, void *C, size_t BBT, size_t INSHAPE, si
                     auto spot = flp(C) + bmmindex * BBT * OUTSHAPE + bbt * OUTSHAPE;
                     for (size_t b = head*headsize; b < (head + 1)*headsize; b += 1)
                     {
-                        double zz1 = dot_floats(flp(A) + b*INSHAPE + bmmindex * INSHAPE*OUTSHAPE, BAINSHAPE, INSHAPE);
+                        double zz1;
+                        if(dtype==kBFLOAT_16){
+                            zz1 = dot_bfloats(bflp(A) + b*INSHAPE + bmmindex * INSHAPE*OUTSHAPE, BAINSHAPE, INSHAPE);
+                        }else{  
+                            zz1 = dot_floats(flp(A) + b*INSHAPE + bmmindex * INSHAPE*OUTSHAPE, BAINSHAPE, INSHAPE);
+                        }
+                    
                         
                         // spot[b] =  zz1;
                         if(func == TANH){
@@ -114,6 +120,13 @@ void matmul_cpu_kernal(void *A, void *B, void *C, size_t BBT, size_t INSHAPE, si
                         }
                         if(func == EXPNEGEXP){
                             spot[b] = exp(-exp(zz1+spot[b]));
+                        }
+                        if(func == VITEMB){
+                            (spot+OUTSHAPE)[b] += zz1; 
+                        }
+                        if(func == GELU){
+                            spot[b] += zz1;
+                            spot[b] = exp(0.851*(spot[b]-abs(spot[b])))*(spot[b]/(1+exp(-1.702*abs(spot[b]))));
                         }
                         
                     }

@@ -22,7 +22,9 @@ enum MMACTFUNC{
     SWISHMUL,
     SIGMOIDMUL,
     SETVALUE,
-    EXPNEGEXP
+    EXPNEGEXP,
+    VITEMB,
+    GELU
 };
 
 // void RcudaMemcpy(void* dst, void* src, size_t size, int type);
@@ -664,6 +666,10 @@ struct Tensor
             memcpy(data, other.data, data_size_in_bytes);
         }
     }
+
+    void operator*=(Tensor other);
+
+     void operator+=(Tensor other);
 
     template <typename T>
     Tensor operator=(T value)

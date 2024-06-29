@@ -131,6 +131,12 @@ public:
     Tensor operator()(Tensor input, Tensor residual)
     {
 
+        if(
+            hasbias
+        ){
+             residual+=bias;
+        }
+
         if (this->quantized)
         {
             return this->weight.matmul(this->range, this->offset, input, residual, activation);
