@@ -4,7 +4,7 @@
 #include "tensor/tensor.h"
 
 // chevron for std::cout
-static std::ostream& operator<<(std::ostream& os, const Tensor& t) {
+static std::ostream& operator<<(std::ostream& os, Tensor t) {
     std::string shapestring = "(";
     for (size_t i = 0; i < t.shape.size(); i++) {
         shapestring += std::to_string(t.shape[i]);

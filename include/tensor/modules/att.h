@@ -56,11 +56,7 @@ public:
         pool->sync();
         if (buffer.data == nullptr || buffer.shape[0] * buffer.shape[1] * buffer.shape[2] < input.shape[1] * input.shape[2] * input.shape[3] || buffer.dtype != input.dtype || buffer.device != input.device)
         {
-            auto newshape = new std::vector<size_t>();
-            newshape->push_back(input.shape[1]);
-            newshape->push_back(input.shape[2]);
-            newshape->push_back(input.shape[3]);
-            buffer = *new Tensor(*newshape, input.dtype, input.device);
+            buffer = *new Tensor(input.shape.slice(1), input.dtype, input.device);
         }
 
         auto cbuf = buffer.cloneWithFalseReshape({input.shape[1], input.shape[2], input.shape[3]});

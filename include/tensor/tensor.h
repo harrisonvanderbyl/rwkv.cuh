@@ -407,9 +407,123 @@ static TENSORTYPE get_tensortype()
     }
 };
 
+#define BARRIERCHECK(x,y) \
+    x;if (x == 18446744073709551615U)  \
+    {                    \
+        return y;          \
+    }
+struct Shape{
+    size_t a = 0;
+    size_t b = 0;
+    size_t c = 0;
+    size_t d = 0;
+    size_t e = 0;
+    size_t f = 0;
+    size_t barrier = 18446744073709551615U;
+
+    Shape(std::vector<size_t> __a){
+        if (__a.size() > 0){
+            a = __a[0];
+        }
+        if (__a.size() > 1){
+            b = __a[1];
+        }
+        if (__a.size() > 2){
+            c = __a[2];
+        }
+        if (__a.size() > 3){
+            d = __a[3];
+        }
+        if (__a.size() > 4){
+            e = __a[4];
+        }
+        if (__a.size() > 5){
+            f = __a[5];
+        }
+
+    };
+
+    Shape(const Shape &other){
+        a = BARRIERCHECK(other.a,);
+        b = BARRIERCHECK(other.b,);
+        c = BARRIERCHECK(other.c,);
+        d = BARRIERCHECK(other.d,);
+        e = BARRIERCHECK(other.e,);
+    };
+
+    Shape &operator=(const Shape &other){
+        a = BARRIERCHECK(other.a,*this);
+        b = BARRIERCHECK(other.b,*this);
+        c = BARRIERCHECK(other.c,*this);
+        d = BARRIERCHECK(other.d,*this);
+        e = BARRIERCHECK(other.e,*this);
+        return *this;
+    };
+
+    Shape (size_t* args){
+        a = args[0];
+        b = args[1];
+        c = args[2];
+        d = args[3];
+        e = args[4];
+        f = args[5];
+    }
+    
+    Shape(){
+        
+    };
+
+    Shape(size_t a, size_t b = 18446744073709551615U, size_t c = 18446744073709551615U, size_t d = 18446744073709551615U, size_t e = 18446744073709551615U, size_t f = 18446744073709551615U){
+        this->a = a;
+        this->b = b;
+        this->c = c;
+        this->d = d;
+        this->e = e;
+        this->f = f;
+    };
+
+    inline size_t operator[](size_t index){
+        return ((size_t*)this)[index];
+    };
+
+    inline size_t size(){
+        auto ndims = 0;
+        size_t* iis = (size_t*)this;
+        for (size_t i = 0; i < 6; i++){
+            if (iis[i] == barrier){
+                return i;
+            }
+            if (iis[i] != 0){
+                ndims = i + 1;
+            }
+        }
+
+        return ndims;
+    };
+
+    inline size_t elements(){
+        size_t out = 1;
+        if(a != -22){out *= a;}else{return out;};
+        if(b != -22){out *= b;}else{return out;};
+        if(c != -22){out *= c;}else{return out;};
+        if(d != -22){out *= d;}else{return out;};
+        if(e != -22){out *= e;}else{return out;};
+        if(f != 18446744073709551615U){out *= f;}else{return out;};
+        return out;
+    }
+
+    
+    inline const Shape& slice(size_t start, size_t end = 0){
+        return *(Shape*)(((size_t*)this) + start);
+    };
+
+    
+
+};
+
 struct Tensor
 {
-    std::vector<size_t> shape;
+    Shape shape;
     size_t data_size_in_bytes;
     TENSORTYPE dtype;
     DEVICE device;
@@ -417,24 +531,20 @@ struct Tensor
     void *data = nullptr;
     Tensor()
     {
-        shape = std::vector<size_t>();
+        // shape = std::vector<size_t>();
         data_size_in_bytes = 0;
         dtype = kFLOAT_32;
         device = CPU;
         device_id = 0;
         data = nullptr;
     }
-    Tensor(std::vector<size_t> shape, TENSORTYPE dtype = TENSORTYPE::kFLOAT_32, DEVICE device = DEVICE::CPU, int device_id = 0)
+    Tensor(Shape shape, TENSORTYPE dtype = TENSORTYPE::kFLOAT_32, DEVICE device = DEVICE::CPU, int device_id = 0)
     {
         this->shape = shape;
         this->dtype = dtype;
         this->device = device;
         this->device_id = device_id;
-        this->data_size_in_bytes = get_dtype_bytes(dtype);
-        for (size_t i = 0; i < shape.size(); i++)
-        {
-            this->data_size_in_bytes *= shape[i];
-        }
+        this->data_size_in_bytes = get_dtype_bytes(dtype)*shape.elements();
 
         if (device == DEVICE::CUDA)
         {
@@ -468,7 +578,7 @@ struct Tensor
         // print current stack trace
     }
 
-    Tensor(std::vector<size_t> shape, void *data, TENSORTYPE dtype = TENSORTYPE::kFLOAT_32, DEVICE device = DEVICE::CPU, int device_id = 0)
+    Tensor(Shape shape, void *data, TENSORTYPE dtype = TENSORTYPE::kFLOAT_32, DEVICE device = DEVICE::CPU, int device_id = 0)
     {
         this->shape = shape;
         this->dtype = dtype;
@@ -501,18 +611,14 @@ struct Tensor
         }
     }
 
-    Tensor cloneWithFalseReshape(std::vector<size_t> newshape)
+    Tensor cloneWithFalseReshape(Shape newshape)
     {
         Tensor new_tensor = Tensor();
         new_tensor.shape = newshape;
         new_tensor.dtype = dtype;
         new_tensor.device = device;
         new_tensor.device_id = device_id;
-        new_tensor.data_size_in_bytes = get_dtype_bytes(dtype);
-        for (size_t i = 0; i < newshape.size(); i++)
-        {
-            new_tensor.data_size_in_bytes *= newshape[i];
-        }
+        new_tensor.data_size_in_bytes = get_dtype_bytes(dtype)*newshape.elements();
         if (new_tensor.data_size_in_bytes > data_size_in_bytes)
         {
             throw std::runtime_error("cloneWithFalseReshape must have same or smaller size, to avoid memory access issues");
@@ -522,17 +628,13 @@ struct Tensor
     }
 
     template <typename T>
-    Tensor(std::vector<size_t> shape, std::vector<T> data, DEVICE device = DEVICE::CPU, int device_id = 0)
+    Tensor(Shape& shape, std::vector<T> data, DEVICE device = DEVICE::CPU, int device_id = 0)
     {
         this->shape = shape;
         this->dtype = get_tensortype<T>();
         this->device = device;
         this->device_id = device_id;
-        this->data_size_in_bytes = get_dtype_bytes(dtype);
-        for (size_t i = 0; i < shape.size(); i++)
-        {
-            this->data_size_in_bytes *= shape[i];
-        }
+        this->data_size_in_bytes = get_dtype_bytes(dtype) * shape.elements();
         posix_memalign(&this->data, 64, this->data_size_in_bytes);
         memcpy(this->data, data.data(), this->data_size_in_bytes);
     }
@@ -625,7 +727,7 @@ struct Tensor
         }
     }
 
-    size_t get_element_count() const
+    size_t get_element_count()
     {
         size_t count = 1;
         for (size_t i = 0; i < shape.size(); i++)
