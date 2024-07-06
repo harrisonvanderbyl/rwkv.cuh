@@ -413,12 +413,12 @@ static TENSORTYPE get_tensortype()
         return y;          \
     }
 struct Shape{
-    size_t a = 0;
-    size_t b = 0;
-    size_t c = 0;
-    size_t d = 0;
-    size_t e = 0;
-    size_t f = 0;
+    size_t a = 18446744073709551615U;
+    size_t b = 18446744073709551615U;
+    size_t c = 18446744073709551615U;
+    size_t d = 18446744073709551615U;
+    size_t e = 18446744073709551615U;
+    size_t f = 18446744073709551615U;
     size_t barrier = 18446744073709551615U;
 
     Shape(std::vector<size_t> __a){
@@ -503,11 +503,11 @@ struct Shape{
 
     inline size_t elements(){
         size_t out = 1;
-        if(a != -22){out *= a;}else{return out;};
-        if(b != -22){out *= b;}else{return out;};
-        if(c != -22){out *= c;}else{return out;};
-        if(d != -22){out *= d;}else{return out;};
-        if(e != -22){out *= e;}else{return out;};
+        if(a != 18446744073709551615U){out *= a;}else{return out;};
+        if(b != 18446744073709551615U){out *= b;}else{return out;};
+        if(c != 18446744073709551615U){out *= c;}else{return out;};
+        if(d != 18446744073709551615U){out *= d;}else{return out;};
+        if(e != 18446744073709551615U){out *= e;}else{return out;};
         if(f != 18446744073709551615U){out *= f;}else{return out;};
         return out;
     }
@@ -584,11 +584,7 @@ struct Tensor
         this->dtype = dtype;
         this->device = device;
         this->device_id = device_id;
-        this->data_size_in_bytes = get_dtype_bytes(dtype);
-        for (size_t i = 0; i < shape.size(); i++)
-        {
-            this->data_size_in_bytes *= shape[i];
-        }
+        this->data_size_in_bytes = get_dtype_bytes(dtype)*shape.elements();
         this->data = data;
     }
 
@@ -619,6 +615,7 @@ struct Tensor
         new_tensor.device = device;
         new_tensor.device_id = device_id;
         new_tensor.data_size_in_bytes = get_dtype_bytes(dtype)*newshape.elements();
+        // std::cout << new_tensor.data_size_in_bytes << " " << data_size_in_bytes << "\n";
         if (new_tensor.data_size_in_bytes > data_size_in_bytes)
         {
             throw std::runtime_error("cloneWithFalseReshape must have same or smaller size, to avoid memory access issues");
