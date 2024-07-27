@@ -11,7 +11,7 @@ CPUONLY(normalize_cpu_kernel(void* input, void* weight, void* bias, void* output
 inline Tensor Tensor::normalize(const Tensor& weight, const Tensor& bias, const Tensor& result, const size_t heads, float eps)
 {
     assert(data != result.data);
-    auto lastshape = this->shape.back();
+    auto lastshape = this->shape[this->shape.size() - 1];
     auto headshape = lastshape / heads;
 
     if (this->device == DEVICE::CPU){

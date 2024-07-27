@@ -134,36 +134,36 @@ public:
     void expand_state(size_t batchsize){
          for (size_t i = 0; i < layers; i++)
         {
-            auto newattshape = blocks[i].att.state.shape;
-            size_t oldbatch = newattshape[0];
-            newattshape[0] = batchsize;
-            auto newattstate = new Tensor(newattshape);
-            for (size_t bb = 0; bb < oldbatch; bb++)
-            {
-                newattstate->copyfrom(blocks[i].att.state[bb]);
-            }
-            blocks[i].att.state.data = newattstate->data;
+            // auto newattshape = blocks[i].att.state.shape;
+            // size_t oldbatch = newattshape[0];
+            // newattshape[0] = batchsize;
+            // auto newattstate = new Tensor(newattshape);
+            // for (size_t bb = 0; bb < oldbatch; bb++)
+            // {
+            //     newattstate->copyfrom(blocks[i].att.state[bb]);
+            // }
+            // blocks[i].att.state.data = newattstate->data;
             
 
             
-            // blocks[i].attshift.state[batchid].copyfrom(ts1);
-            auto newattshiftshape = blocks[i].attshift.state.shape;
-            newattshiftshape[0] = batchsize;
-            auto newattshiftstate = new Tensor(newattshiftshape);
-            for (size_t bb = 0; bb < oldbatch; bb++)
-            {
-                newattshiftstate->copyfrom(blocks[i].attshift.state[bb]);
-            }
-            blocks[i].attshift.state.data = newattshiftstate->data;
+            // // blocks[i].attshift.state[batchid].copyfrom(ts1);
+            // auto newattshiftshape = blocks[i].attshift.state.shape;
+            // newattshiftshape[0] = batchsize;
+            // auto newattshiftstate = new Tensor(newattshiftshape);
+            // for (size_t bb = 0; bb < oldbatch; bb++)
+            // {
+            //     newattshiftstate->copyfrom(blocks[i].attshift.state[bb]);
+            // }
+            // blocks[i].attshift.state.data = newattshiftstate->data;
 
-            auto newffnshiftshape = blocks[i].ffnshift.state.shape;
-            newffnshiftshape[0] = batchsize;
-            auto newffnshiftstate = new Tensor(newffnshiftshape);
-            for (size_t bb = 0; bb < oldbatch; bb++)
-            {
-                newffnshiftstate->copyfrom(blocks[i].ffnshift.state[bb]);
-            }
-            blocks[i].ffnshift.state.data = newffnshiftstate->data;
+            // auto newffnshiftshape = blocks[i].ffnshift.state.shape;
+            // newffnshiftshape[0] = batchsize;
+            // auto newffnshiftstate = new Tensor(newffnshiftshape);
+            // for (size_t bb = 0; bb < oldbatch; bb++)
+            // {
+            //     newffnshiftstate->copyfrom(blocks[i].ffnshift.state[bb]);
+            // }
+            // blocks[i].ffnshift.state.data = newffnshiftstate->data;
             // blocks[i].ffnshift.state[batchid].copyfrom(ts2);
             
         }

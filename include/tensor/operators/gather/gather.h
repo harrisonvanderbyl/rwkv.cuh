@@ -2,15 +2,14 @@
 #define GATHER_H
 #include "tensor/tensor.h"
 inline Tensor Tensor::operator[](const size_t index) {
-    std::vector<size_t> new_shape;
+    auto newshape = shape.slice(1);
     size_t skipdata = get_dtype_bytes(dtype);
     for (size_t i = 1; i < shape.size(); i++) {
-        new_shape.push_back(shape[i]);
         skipdata *= shape[i];
     }
     void* ndata = (void*)((char*)data + index * skipdata);
     
-    auto out = Tensor(new_shape, ndata, dtype, device, device_id);
+    auto out = Tensor(newshape, ndata, dtype, device, device_id);
 
     return out;
 }
