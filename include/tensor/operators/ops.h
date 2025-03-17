@@ -7,7 +7,7 @@
 #include "tensor/operators/lerp/lerp.h"
 #include "tensor/operators/matmul/matmul8.h"
 
-#if defined(__CUDACC__)
+#if defined(__CUDACC__) || defined(__HIPCC__)
 #include "tensor/operators/normalize/normalize.cuh"
 #include "tensor/operators/lerp/lerp.cuh"
 #include "tensor/operators/matmul/matmul8.cuh"

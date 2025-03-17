@@ -4,10 +4,7 @@
 #include <cassert>
 #include <cstdio>
 #include <cstdlib>
-#include <cuda_runtime.h>
 #include "tensor/operators/matmul/kernels/globals.cuh"
-#include <cuda_bf16.h>
-#include <cuda_fp16.h>
 // uint8
 
 #define BN 32U
@@ -429,7 +426,10 @@ __global__ void kernelc_mm8_one(
     }
 
     for (int ij = 1; ij < warpSize; ij *= 2)
-      acc += __shfl_xor_sync(-1, acc, ij);
+    {
+      float a = __shfl_xor_sync(-1, *((float*)(&acc)), ij);
+      acc += *((__nv_bfloat162*)(&a));
+    }
     
     // pool[warpid] = acc;
 

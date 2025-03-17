@@ -4,10 +4,7 @@
 #include <cassert>
 #include <cstdio>
 #include <cstdlib>
-#include <cuda_runtime.h>
 #include "tensor/operators/matmul/kernels/globals.cuh"
-#include <cuda_bf16.h>
-#include <cuda_fp16.h>
 // uint8
 
 #define BN 32U

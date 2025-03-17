@@ -27,8 +27,61 @@ enum MMACTFUNC{
 
 // void RcudaMemcpy(void* dst, void* src, size_t size, int type);
 // #define RcudaMalloc(...) throw std::runtime_error("Not compiled with cuda")
+#if defined(__HIPCC__)
+#define cudaMemcpyKind(x) hipMemcpyKind(x)
+#define cudaMemcpyHostToDevice hipMemcpyHostToDevice
+#define cudaMemcpyDeviceToHost hipMemcpyDeviceToHost
+#define cudaMemcpyDeviceToDevice hipMemcpyDeviceToDevice
+#define hipMemcpy hipMemcpy
+#define hipMemcpyHostToHost hipMemcpyHostToHost
+#define hipMemcpyHostToDevice hipMemcpyHostToDevice
+#define hipMemcpyDeviceToHost hipMemcpyDeviceToHost
+#define hipMemcpyDeviceToDevice hipMemcpyDeviceToDevice
+#define hipMemcpyDefault hipMemcpyDefault
+#define hipMemcpyKind hipMemcpyKind
+#define hipMemcpyHost hipMemcpyHost
+#define hipMemcpyDevice hipMemcpyDevice
+#define hipMemcpyPinned hipMemcpyPinned
+#define hipMemcpyType hipMemcpyType
+#define hipMemcpy3DParms hipMemcpy3DParms
+#define hipMemcpy3D hipMemcpy3D
+#define CUDA_SUCCESS hipSuccess
+#define cudaError_t hipError_t
+#define cudaSuccess hipSuccess
+#define cudaGetErrorName hipGetErrorName
+#define cudaGetErrorString hipGetErrorString
+#define cudaMemset hipMemset
+#define cudaMalloc hipMalloc
+#define cudaMallocHost hipHostMalloc
+#define cudaFree hipFree
+#define cudaFreeHost hipHostFree
+#define cudaDeviceSynchronize hipDeviceSynchronize
+#define cudaStreamSynchronize hipStreamSynchronize
+#define cudaStreamCreate hipStreamCreate
+#define cudaMemcpy hipMemcpy
+#define cudaDeviceReset hipDeviceReset
+#define cudaDeviceGetAttribute hipDeviceGetAttribute
+#define cudaDeviceSynchonize hipDeviceSynchronize
+#define cudaGetLastError hipGetLastError
 
-#if !defined(__CUDACC__)
+#include "hip/hip_runtime.h"
+#include "hip/hip_fp16.h"
+#include "hip/hip_bf16.h"
+#define __shfl_xor_sync(a,b,c) __shfl_xor(b,c)
+#define __nv_bfloat162 __hip_bfloat162
+#define __float2bfloat162_rn(x) __float22bfloat162_rn(float2(x))
+#define __floats2bfloat162_rn(x,y) __float22bfloat162_rn(float2(x,y))
+#define __nv_bfloat16 __hip_bfloat16
+#define __uint2bfloat16_rd(x) __float2bfloat16(__uint2float_rd(x))
+#endif
+
+#if defined(__CUDACC__)
+#include "cuda_runtime.h"
+#include "cuda_fp16.h"
+#include "cuda_bf16.h"
+#endif
+
+#if !defined(__CUDACC__) && !defined(__HIPCC__)
 
 #define CUDAONLY(x) \
     void __attribute__((weak)) x { throw std::runtime_error("Not compiled with cuda"); }
@@ -85,7 +138,7 @@ static int posix_memalign(void **memptr, size_t alignment, size_t size)
 
 // backtrace
 #if defined(__CUDACC__) || defined(__HIPCC__)
-#include "cuda_runtime.h"
+
 
 static void check_for_errors()
 {
@@ -823,7 +876,7 @@ struct Tensor
     inline Tensor reshape(std::vector<size_t> shape);
 };
 
-#if defined(__CUDACC__)
+#if defined(__CUDACC__) || defined(__HIPCC__)
 Tensor Tensor::cuda(bool transpose)
 {
     if (device == DEVICE::CUDA)

@@ -1,6 +1,5 @@
 #ifndef NORMALIZE_CUH
 #define NORMALIZE_CUH
-#include <cuda_runtime.h>
 #include "tensor/tensor.h"
 
 #define CUNORMTHREADS 32
